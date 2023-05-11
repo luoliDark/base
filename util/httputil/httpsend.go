@@ -1,7 +1,6 @@
 package httputil
 
 import (
-	"base/loghelper"
 	"bytes"
 	"encoding/json"
 	"io/ioutil"
@@ -9,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/luoliDark/base/loghelper"
 )
 
 const (

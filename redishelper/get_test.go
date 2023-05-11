@@ -1,9 +1,10 @@
 package redishelper
 
 import (
-	"base/confighelper"
 	"fmt"
 	"testing"
+
+	"github.com/luoliDark/base/confighelper"
 )
 
 func TestGetList(t *testing.T) {

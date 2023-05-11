@@ -1,18 +1,18 @@
 package dbhelper
 
 import (
-	"base/db/conn"
-	"base/loghelper"
-	"base/sysmodel"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
-	"base/util/jsonutil"
 	"bytes"
 	"errors"
 	"strconv"
 	"strings"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/jsonutil"
 	"github.com/xormplus/xorm"
 )
 

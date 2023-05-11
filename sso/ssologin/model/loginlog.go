@@ -1,8 +1,9 @@
 package ssomodel
 
 import (
-	"base/db/conn"
 	"time"
+
+	"github.com/luoliDark/base/db/conn"
 )
 
 // 登录日志表

@@ -1,6 +1,6 @@
 package wf
 
-import "base/util/commutil"
+import "github.com/luoliDark/base/util/commutil"
 
 // NotGetUserAction
 const (

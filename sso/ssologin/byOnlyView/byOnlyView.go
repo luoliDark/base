@@ -1,13 +1,14 @@
 package byOnlyView
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/redishelper"
-	"base/sso/ssologin/byaccount"
-	"base/sysmodel"
-	"base/sysmodel/eb"
 	"errors"
+
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/redishelper"
+	"github.com/luoliDark/base/sso/ssologin/byaccount"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/eb"
 )
 
 type OnlyViewUser struct {

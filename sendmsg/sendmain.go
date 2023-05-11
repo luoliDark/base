@@ -1,19 +1,19 @@
 package sendmsg
 
 import (
-	"base/db/conn"
-	"base/db/dbhelper"
-	"base/loghelper"
-	"base/redishelper/rediscache"
-	"base/sysmodel"
-	"base/sysmodel/bbs"
-	"base/util/commutil"
-	"base/util/httputil"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper/rediscache"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/bbs"
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/httputil"
 )
 
 //发送消息入口方法

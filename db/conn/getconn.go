@@ -1,17 +1,17 @@
 package conn
 
 import (
-	"base/confighelper"
-	"base/loghelper"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
-	_ "base/util/commutil"
 	"bytes"
 	"fmt"
 	"strings"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
+	_ "github.com/luoliDark/base/util/commutil"
 	"github.com/xormplus/xorm"
 )
 

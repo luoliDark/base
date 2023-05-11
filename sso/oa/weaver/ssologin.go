@@ -1,11 +1,12 @@
 package weaver
 
 import (
-	"base/db/conn"
-	"base/sso/ssologin/byaccount"
-	"base/sysmodel"
-	"base/sysmodel/eb"
 	"errors"
+
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/sso/ssologin/byaccount"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/eb"
 )
 
 //des对称解密 登录

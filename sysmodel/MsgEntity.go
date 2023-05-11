@@ -1,6 +1,6 @@
 package sysmodel
 
-import "base/sysmodel/eb"
+import "github.com/luoliDark/base/sysmodel/eb"
 
 type MsgEntity struct {
 	EntId             int          //企业ID

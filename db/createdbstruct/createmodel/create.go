@@ -1,11 +1,11 @@
 package createmodel
 
 import (
-	"base/db/conn"
 	"fmt"
 	"strings"
 
 	"github.com/gohouse/converter"
+	"github.com/luoliDark/base/db/conn"
 )
 
 // CreateStructBySql 根据SQL生成实体类

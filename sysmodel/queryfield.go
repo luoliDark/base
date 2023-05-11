@@ -1,9 +1,10 @@
 package sysmodel
 
 import (
-	"base/util/commutil"
 	"bytes"
 	"strings"
+
+	"github.com/luoliDark/base/util/commutil"
 )
 
 // 查询字段实体类，用于列表查询时传回用户输入的字段数据

@@ -1,10 +1,11 @@
 package weaver
 
 import (
-	"base/db/dbhelper"
 	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
+
+	"github.com/luoliDark/base/db/dbhelper"
 )
 
 var ssokey string

@@ -1,8 +1,9 @@
 package common
 
 import (
-	"base/db/conn"
-	"base/util/commutil"
+	"github.com/luoliDark/base/db/conn"
+	ssomodel "github.com/luoliDark/base/sso/ssologin/model"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 //插入登录日志

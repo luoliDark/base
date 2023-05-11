@@ -1,12 +1,13 @@
 package createtable
 
 import (
-	"base/db/conn"
-	"base/db/dbhelper"
-	"base/sysmodel"
-	"base/util/commutil"
 	"bytes"
 	"strings"
+
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 //表单管理字段确定好以后 创建表结构

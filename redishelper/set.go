@@ -3,11 +3,10 @@
 package redishelper
 
 import (
-	"base/loghelper"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
-
 	"github.com/garyburd/redigo/redis"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 //SetHashMap set map对象到redis中 针对interface对象

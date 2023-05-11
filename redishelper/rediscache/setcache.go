@@ -1,10 +1,11 @@
 package rediscache
 
 import (
-	"base/confighelper"
-	"base/redishelper"
-	"base/util/commutil"
 	"strings"
+
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/redishelper"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 // SetString 设置String对象

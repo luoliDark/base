@@ -3,10 +3,9 @@
 package redishelper
 
 import (
-	"base/util/commutil"
-
 	"github.com/garyburd/redigo/redis"
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 // 检查是否存在某key

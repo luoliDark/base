@@ -1,6 +1,6 @@
 package restentity
 
-import "base/sysmodel"
+import "github.com/luoliDark/base/sysmodel"
 
 //查询列表页主数据rest
 type BaseDs struct {

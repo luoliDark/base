@@ -1,9 +1,10 @@
 package createtable
 
 import (
-	"base/sysmodel"
 	"fmt"
 	"testing"
+
+	"github.com/luoliDark/base/sysmodel"
 )
 
 func TestCreateTable(t *testing.T) {

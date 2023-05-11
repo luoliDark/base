@@ -1,11 +1,8 @@
 package excelutil
 
 import (
-	"base/constant"
-	"base/util/commutil"
 	"fmt"
 	"regexp"
-	"runingproject/services/excel/export"
 	"runtime/debug"
 	"strconv"
 	"strings"
@@ -14,6 +11,9 @@ import (
 
 	"github.com/360EntSecGroup-Skylar/excelize"
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/constant"
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/runingproject/services/excel/export"
 )
 
 var ExcelRegexpNumberType = regexp.MustCompile(`\b(int|tinyint|smallint|mediumint|bigint|float|double|decimal|numeric)\b`)

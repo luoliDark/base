@@ -1,10 +1,10 @@
 package jsonutil
 
 import (
-	"base/sysmodel"
 	"encoding/json"
 	"fmt"
 
+	"github.com/luoliDark/base/sysmodel"
 	"github.com/valyala/fastjson"
 )
 

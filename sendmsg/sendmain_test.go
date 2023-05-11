@@ -1,11 +1,12 @@
 package sendmsg
 
 import (
-	"base/db/conn"
-	"base/sysmodel"
-	"base/sysmodel/eb"
-	"base/util/commutil"
 	"testing"
+
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/eb"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 func TestSendMain(t *testing.T) {

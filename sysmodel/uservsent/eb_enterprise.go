@@ -1,13 +1,13 @@
 package uservsent
 
 import (
-	"base/db/dbhelper"
-	"base/loghelper"
-	"base/redishelper/rediscache"
-	"base/sysmodel/logtype"
 	"strings"
 
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper/rediscache"
+	"github.com/luoliDark/base/sysmodel/logtype"
 )
 
 type Eb_enterprise struct {

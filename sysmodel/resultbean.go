@@ -3,8 +3,9 @@
 package sysmodel
 
 import (
-	"base/util/commutil"
 	"encoding/json"
+
+	"github.com/luoliDark/base/util/commutil"
 )
 
 type ResultBean struct {

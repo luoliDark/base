@@ -1,9 +1,6 @@
 package rediscache
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/db/dbhelper"
 	"bytes"
 	"encoding/xml"
 	"errors"
@@ -11,6 +8,9 @@ import (
 	"io/ioutil"
 	"os"
 
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/db/dbhelper"
 	"github.com/xormplus/xorm"
 )
 

@@ -1,15 +1,6 @@
 package sso
 
 import (
-	"base/confighelper"
-	"base/db/dbhelper"
-	"base/loghelper"
-	"base/redishelper"
-	"base/sso/ssologin/byaccount"
-	"base/sso/ssologin/common"
-	"base/sysmodel"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
 	"encoding/json"
 	"errors"
 	"runtime/debug"
@@ -19,6 +10,15 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper"
+	"github.com/luoliDark/base/sso/ssologin/byaccount"
+	"github.com/luoliDark/base/sso/ssologin/common"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 // 根据token获取用户信息

@@ -1,16 +1,17 @@
 package byaccount
 
 import (
-	"base/db/dbhelper"
-	"base/loghelper"
-	"base/redishelper/rediscache"
-	ssomodel "base/sso/ssologin/model"
-	"base/sysmodel"
-	"base/sysmodel/eb"
-	"base/util/commutil"
-	"base/util/encryptutil"
 	"errors"
 	"fmt"
+
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper/rediscache"
+	ssomodel "github.com/luoliDark/base/sso/ssologin/model"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/eb"
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/encryptutil"
 )
 
 func checkUserPwd(ssouser *sysmodel.SSOUser, password string) (*eb.Eb_user, error) {

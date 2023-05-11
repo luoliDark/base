@@ -5,13 +5,6 @@
 package rediscache
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/db/dbhelper"
-	"base/loghelper"
-	"base/redishelper"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
 	"encoding/xml"
 	"fmt"
 	"io/ioutil"
@@ -21,6 +14,13 @@ import (
 
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
 	"github.com/xormplus/xorm"
 )
 

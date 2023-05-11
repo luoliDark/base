@@ -1,9 +1,10 @@
 package languageengine
 
 import (
-	"base/db/dbhelper"
-	"base/util/commutil"
 	"strings"
+
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 var I18NTABEL_SUFFIX = "_i18n"

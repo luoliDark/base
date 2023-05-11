@@ -1,14 +1,14 @@
 package logserverconn
 
 import (
-	"base/confighelper"
-	"base/loghelper"
-	"base/util/commutil"
-	_ "base/util/commutil"
 	"bytes"
 
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/util/commutil"
+	_ "github.com/luoliDark/base/util/commutil"
 	"github.com/xormplus/xorm"
 )
 

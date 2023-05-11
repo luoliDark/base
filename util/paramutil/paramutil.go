@@ -1,9 +1,10 @@
 package paramutil
 
 import (
-	"base/db/conn"
-	"base/redishelper/rediscache"
 	"time"
+
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/redishelper/rediscache"
 )
 
 var ROW, COL string

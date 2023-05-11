@@ -1,8 +1,8 @@
 package db
 
 import (
-	"base/db/conn"
-	"base/util/commutil"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 const ApiLog = "ApiLog"         //外部调用API LOG

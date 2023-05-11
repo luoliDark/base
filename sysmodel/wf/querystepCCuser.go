@@ -1,6 +1,6 @@
 package wf
 
-import "base/sysmodel/matrix"
+import "github.com/luoliDark/base/sysmodel/matrix"
 
 type QuerystepCCuser struct {
 	AccID      int    `xorm:"accid" json:"accid"`

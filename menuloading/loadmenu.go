@@ -1,13 +1,12 @@
 package menuloading
 
 import (
-	"base/db/dbhelper"
-	"base/menuloading/model"
-	"base/sysmodel"
-	"base/util/commutil"
-	"base/util/jsonutil"
-
 	"github.com/gogf/gf/frame/g"
+	"github.com/luoliDark/base/db/dbhelper"
+	"github.com/luoliDark/base/menuloading/model"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/jsonutil"
 )
 
 // create by zhongxinjian 2020年3月6日21:38:13

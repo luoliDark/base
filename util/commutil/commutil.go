@@ -3,9 +3,6 @@
 package commutil
 
 import (
-	"base/loghelper"
-	"base/sysmodel/logtype"
-	"base/util/snow"
 	"bytes"
 	"container/list"
 	"encoding/json"
@@ -22,6 +19,9 @@ import (
 
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/util/gconv"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/snow"
 	uuid "github.com/satori/go.uuid"
 	"github.com/valyala/fastjson"
 )

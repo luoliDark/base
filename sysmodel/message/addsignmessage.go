@@ -6,9 +6,9 @@ package message
  * @Date 11:59 2020/2/21
  **/
 import (
-	"base/db/conn"
-	"base/sysmodel/wf"
-	"base/util/commutil"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/sysmodel/wf"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 // 消息实体类

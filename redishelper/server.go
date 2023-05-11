@@ -1,13 +1,13 @@
 package redishelper
 
 import (
-	"base/confighelper"
-	"base/loghelper"
-	"base/util/commutil"
 	"fmt"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 //全局变量，用来保存16个库的连接对象

@@ -1,9 +1,9 @@
 package xormutil
 
 import (
-	"base/db/conn"
 	"reflect"
 
+	"github.com/luoliDark/base/db/conn"
 	"github.com/xormplus/xorm"
 )
 

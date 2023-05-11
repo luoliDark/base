@@ -1,11 +1,11 @@
 package sysmodel
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/loghelper"
-	"base/sysmodel/logtype"
-	"base/util/commutil"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 type SqlDataType struct {

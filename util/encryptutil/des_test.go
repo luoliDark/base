@@ -1,10 +1,10 @@
 package encryptutil
 
 import (
-	"base/confighelper"
 	"fmt"
 	"testing"
 
+	"github.com/luoliDark/base/confighelper"
 	"github.com/wumansgy/goEncrypt"
 )
 

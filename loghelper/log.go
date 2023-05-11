@@ -1,7 +1,6 @@
 package loghelper
 
 import (
-	"base/confighelper"
 	"bytes"
 	"encoding/json"
 	"errors"
@@ -11,6 +10,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/luoliDark/base/confighelper"
 	"github.com/rs/zerolog"
 )
 

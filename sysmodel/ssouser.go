@@ -1,6 +1,6 @@
 package sysmodel
 
-import ssomodel "base/sso/ssologin/model"
+import ssomodel "github.com/luoliDark/base/sso/ssologin/model"
 
 //登录用户对象信息 用于保存到redis sessionDB中
 type SSOUser struct {

@@ -3,11 +3,11 @@
 package createtable
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/loghelper"
-	"base/sysmodel"
-	"base/sysmodel/logtype"
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/logtype"
 )
 
 //表单管理字段确定好以后 创建表结构

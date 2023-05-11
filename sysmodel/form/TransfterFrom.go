@@ -1,6 +1,6 @@
 package form
 
-import "base/sysmodel/form/design"
+import "github.com/luoliDark/base/sysmodel/form/design"
 
 type TransfterFrom struct {
 	Sys_fpageid     []Sys_fpageid

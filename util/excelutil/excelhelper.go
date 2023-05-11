@@ -1,7 +1,6 @@
 package excelutil
 
 import (
-	"base/util/commutil"
 	"fmt"
 	"os"
 	"path"
@@ -9,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 
+	"github.com/luoliDark/base/util/commutil"
 	"github.com/tealeg/xlsx"
 )
 

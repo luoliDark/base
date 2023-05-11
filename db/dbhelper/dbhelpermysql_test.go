@@ -1,10 +1,11 @@
 package dbhelper
 
 import (
-	"base/sysmodel"
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/luoliDark/base/sysmodel"
 )
 
 func TestExecProc(t *testing.T) {

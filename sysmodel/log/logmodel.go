@@ -1,7 +1,7 @@
 package log
 
 import (
-	"base/db/conn/logserverconn"
+	"github.com/luoliDark/base/db/conn/logserverconn"
 )
 
 type Logger interface {

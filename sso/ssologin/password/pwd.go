@@ -1,13 +1,14 @@
 package password
 
 import (
-	"base/confighelper"
-	"base/db/conn"
-	"base/loghelper"
-	"base/sysmodel"
-	"base/sysmodel/eb"
-	"base/util/encryptutil"
 	"fmt"
+
+	"github.com/luoliDark/base/confighelper"
+	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/sysmodel/eb"
+	"github.com/luoliDark/base/util/encryptutil"
 )
 
 /**
