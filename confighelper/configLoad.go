@@ -48,8 +48,7 @@ func LoadGoEnv() string {
 			if path == "" {
 				errmsg := "没有配置goenv环境变量，该变量用于保存config文件目录，请先配置"
 				fmt.Println(errmsg)
-				//panic(errmsg)
-				path = "/Users/luoli/go/src/BpmServer/config/"
+				panic(errmsg)
 			}
 		}
 

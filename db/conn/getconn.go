@@ -52,11 +52,16 @@ func InitConnections() {
 	//初始化主库连接
 	initConn(DBType, DBType)
 
-	//初始化OCR识别库连接
-	//initConn("ocrdb")
+	//初始化营收稽核 外部原始数据库
+	//initConn(DBType, "saleexdb")
+
+	//初始化营收稽核 按天汇总的 数据库
+	//initConn(DBType, "salesumdb")
 
 	//初始化 商旅平台 数据库
-	initConn(DBType, "easytradb")
+	//initConn(DBType, "easytradb")
+
+	initConn(DBType, "busfadb")
 }
 
 //初始化连接
@@ -324,4 +329,21 @@ func GetConnection(userid string, ismasterdb bool) (db *xorm.Engine, err error) 
 		// 从数据库连接   暂不实现，理论上应该读取EngineMap里的数据库连接
 		return GetDB()
 	}
+}
+
+/**
+业财融合数据库链接
+*/
+func GetBusFaDb() (db *xorm.Engine, err error) {
+
+	//初始化对象
+	if EngineMap == nil || EngineMap["busfadb"] == nil {
+		// 连接串是空的  重新执行数据库连接获取
+		InitConnections()
+	}
+	db = EngineMap["busfadb"]
+	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
+	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
+
+	return db, err
 }
