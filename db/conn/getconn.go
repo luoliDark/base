@@ -1,17 +1,18 @@
 package conn
 
 import (
+	"base/confighelper"
+	"base/loghelper"
+	"base/sysmodel/logtype"
+	"base/util/commutil"
+	_ "base/util/commutil"
 	"bytes"
 	"fmt"
+	"strings"
+
 	_ "github.com/denisenkom/go-mssqldb"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/xormplus/xorm"
-	"paas/base/confighelper"
-	"paas/base/loghelper"
-	"paas/base/sysmodel/logtype"
-	"paas/base/util/commutil"
-	_ "paas/base/util/commutil"
-	"strings"
 )
 
 const CONF_SEC_GLOBAL = "global"
