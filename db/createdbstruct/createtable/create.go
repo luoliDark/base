@@ -65,12 +65,12 @@ func DropTable(userID string, tableName string) bool {
 }
 
 //增加字段
-func AddField(userID string, tableName string, fields []sysmodel.SqlField) bool {
+func AddField(userID string, tableName string, fields []sysmodel.SqlField, dbname string) bool {
 	switch confighelper.GetCurrdb() {
 	case conn.DBTYPE_MYSQL:
-		return addField_mysql(userID, tableName, fields)
+		return addField_mysql(userID, tableName, fields, dbname)
 	case conn.DBTYPE_SQLSERVER:
-		return addField_sqlserver(userID, tableName, fields)
+		return addField_sqlserver(userID, tableName, fields, dbname)
 	default:
 		loghelper.ByHighError(logtype.CreateTableErr, "currdb配置错误", userID)
 		panic("建表错误currdb配置错误")

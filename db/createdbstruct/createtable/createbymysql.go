@@ -209,12 +209,12 @@ func dropTable_mysql(userID string, tableName string) bool {
 }
 
 //增加字段
-func addField_mysql(userID string, tableName string, fields []sysmodel.SqlField) bool {
+func addField_mysql(userID string, tableName string, fields []sysmodel.SqlField, dbname string) bool {
 	sqlList := make([]string, len(fields))
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " add column ", concatMysqlFieldDefine(field))
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, dbname)
 	return success
 	return false
 }

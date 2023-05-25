@@ -192,7 +192,7 @@ func dropTable_sqlserver(userID string, tableName string) bool {
 }
 
 //增加字段
-func addField_sqlserver(userID string, tableName string, fields []sysmodel.SqlField) bool {
+func addField_sqlserver(userID string, tableName string, fields []sysmodel.SqlField, dbname string) bool {
 	sqlList := make([]string, len(fields))
 	for index, field := range fields {
 
@@ -211,7 +211,7 @@ func addField_sqlserver(userID string, tableName string, fields []sysmodel.SqlFi
 		}
 		sqlList[index] = sql
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, dbname)
 	return success
 	return false
 }
