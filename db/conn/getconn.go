@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/luoliDark/base/db/enum"
+
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/sysmodel/logtype"
@@ -290,6 +292,23 @@ func GetConnection(userid string, ismasterdb bool) (db *xorm.Engine, err error) 
 	}
 }
 
+func GetDBConnection(userid string, ismasterdb bool, dbname string) (db *xorm.Engine, err error) {
+	if dbname == enum.ExSaleDb {
+		engine, _ := GetSaleExDb()
+		db = engine
+	} else if dbname == enum.ExSaleSumDb {
+		engine, _ := GetSaleSumDb()
+		db = engine
+	} else if dbname == enum.BusFaDb {
+		engine, _ := GetSaleSumDb()
+		db = engine
+	} else {
+		engine, _ := GetConnection(userid, true)
+		db = engine
+	}
+	return db, nil
+}
+
 // 获取数据库连接对象，主从方式获取，根据传递的userid 确定从数据库连接
 // 需要手动关闭连接
 func GetConnectionBySession(ismasterdb bool) (session *xorm.Session) {
@@ -301,4 +320,21 @@ func GetConnectionBySession(ismasterdb bool) (session *xorm.Session) {
 		panic("数据库连接为空！")
 	}
 	return db.NewSession()
+}
+
+/**
+业财融合数据库链接
+*/
+func GetBusFaDb() (db *xorm.Engine, err error) {
+
+	//初始化对象
+	if EngineMap == nil || EngineMap["busfadb"] == nil {
+		// 连接串是空的  重新执行数据库连接获取
+		InitConnections()
+	}
+	db = EngineMap["busfadb"]
+	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
+	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
+
+	return db, err
 }
