@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"strings"
 
-	_ "github.com/denisenkom/go-mssqldb"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/sysmodel/logtype"
 	"github.com/luoliDark/base/util/commutil"
 	_ "github.com/luoliDark/base/util/commutil"
+
+	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/xormplus/xorm"
 )
 
@@ -23,7 +24,6 @@ const CONF_DBPASSWORD = "password"
 const CONF_DBPORT = "port"
 const CONF_DBNAME = "database"
 const DBTYPE_MYSQL = "mysql"
-const DBTYPE_OCR = "ocrdb"
 const DBTYPE_SQLSERVER = "mssql"
 
 //采用单例
@@ -34,7 +34,6 @@ func init() {
 	// 初始化数据库连接对象
 	// 初始化连接过程，需要把所有的数据库连接都初始化好，如slave 和 master 然后存储在map里面
 	InitConnections()
-
 }
 
 func InitConnections() {
@@ -53,15 +52,13 @@ func InitConnections() {
 	initConn(DBType, DBType)
 
 	//初始化营收稽核 外部原始数据库
-	//initConn(DBType, "saleexdb")
+	initConn(DBType, "saleexdb")
 
 	//初始化营收稽核 按天汇总的 数据库
-	//initConn(DBType, "salesumdb")
+	initConn(DBType, "salesumdb")
 
 	//初始化 商旅平台 数据库
-	//initConn(DBType, "easytradb")
-
-	initConn(DBType, "busfadb")
+	initConn(DBType, "easytradb")
 }
 
 //初始化连接
@@ -121,66 +118,6 @@ func initConn(DBType string, dbName string) {
 	}
 }
 
-//初始化连接
-//func initConn(DBType string) {
-//	section := DBType
-//	server := confighelper.GetIniConfig(section, CONF_DBSERVER)
-//	port := confighelper.GetIniConfig(section, CONF_DBPORT)
-//	username := confighelper.GetIniConfig(section, CONF_DBUSERNAME)
-//	password := confighelper.GetIniConfig(section, CONF_DBPASSWORD)
-//	database := confighelper.GetIniConfig(section, CONF_DBNAME)
-//
-//	if server == "" || username == "" || password == "" || database == "" {
-//		fmt.Println("连接数据库" + section + "失败，服务器地址或账号密码未设置")
-//		return
-//	}
-//
-//	var currDbUrl string
-//	isdev := commutil.ToBool(confighelper.GetIniConfig("global", "isdeving"))
-//
-//	switch strings.ToLower(DBType) {
-//	case DBTYPE_MYSQL, DBTYPE_OCR:
-//		currDbUrl = concatMysql(server, port, username, password, database)
-//		db, err := xorm.NewEngine(DBTYPE_MYSQL, currDbUrl)
-//		if err != nil {
-//			loghelper.ByHighError(logtype.GetConnErr, err.Error(), "")
-//		}
-//
-//		if isdev {
-//			//开发模式
-//			db.ShowSQL(true)
-//		}
-//
-//		//连接池设置
-//		db.SetMaxIdleConns(30)
-//		db.SetMaxOpenConns(200)
-//
-//		if DBType == DBTYPE_MYSQL {
-//			EngineMap[DBTYPE_MYSQL] = db
-//		} else {
-//			EngineMap[DBTYPE_OCR] = db
-//		}
-//	case DBTYPE_SQLSERVER:
-//		currDbUrl = concatSqlServer(server, port, username, password, database)
-//		db, err := xorm.NewEngine(DBType, currDbUrl)
-//		if err != nil {
-//			loghelper.ByHighError(logtype.GetConnErr, err.Error(), "")
-//		}
-//		//todo
-//		if isdev {
-//			//开发模式
-//			db.ShowSQL(true)
-//		}
-//		//连接池设置
-//		db.SetMaxIdleConns(30)
-//		db.SetMaxOpenConns(200)
-//		EngineMap[DBTYPE_SQLSERVER] = db
-//	default:
-//		loghelper.ByHighError(logtype.GetConnErr, "请检查config.ini中currdb 配置", "")
-//		panic("获取连接对象失败,请检查config.ini中currdb 配置")
-//	}
-//}
-
 // 拼接连接mysql 字符串
 // server  ip地址
 // port   端口，为空则使用默认
@@ -224,7 +161,7 @@ func concatSqlServer(server string, port string, username string, password strin
 }
 
 // GetConnStr  获取当前连接字符串
-func GetConnStr() string {
+func GetConnStr(dbname string) string {
 
 	// 读取配置文件
 	DBType = confighelper.GetIniConfig(CONF_SEC_GLOBAL, CONF_CURRDB)
@@ -234,7 +171,10 @@ func GetConnStr() string {
 	if DBType == "" {
 		DBType = DBTYPE_MYSQL
 	}
-	section := DBType
+	if dbname == "" {
+		dbname = DBType
+	}
+	section := dbname
 	server := confighelper.GetIniConfig(section, CONF_DBSERVER)
 	port := confighelper.GetIniConfig(section, CONF_DBPORT)
 	username := confighelper.GetIniConfig(section, CONF_DBUSERNAME)
@@ -243,7 +183,6 @@ func GetConnStr() string {
 
 	if server == "" || username == "" || password == "" || database == "" {
 		fmt.Println("连接数据库" + section + "失败，服务器地址或账号密码未设置")
-		return ""
 	}
 
 	var currDbUrl string
@@ -263,7 +202,9 @@ func GetConnStr() string {
 	return currDbUrl
 }
 
-// GetConnection 获取连接对象
+// GetDBConnection 获取连接对象
+// Engine调用一个SQL都会创建新的Session，完毕又会关闭Session， 多个SQL语句场景，非常消耗性能
+// 多个SQL语句场景，建议使用 GetSession 获取Session ，注意需要手动关闭 建议使用该方法关闭：defer session.Close()
 func GetDB() (db *xorm.Engine, err error) {
 
 	//初始化对象
@@ -278,14 +219,33 @@ func GetDB() (db *xorm.Engine, err error) {
 	return db, err
 }
 
-// GetDBConnection 获取连接对象
-func GetSession(ismasterdb bool) (db *xorm.Session) {
-	eng, err := GetConnection("", ismasterdb)
+/*
+ 获取session,多个SQL语句场景，建议使用 GetSession 获取Session ，注意需要手动关闭 建议使用该方法关闭：defer session.Close()
+*/
+func GetSession() (session *xorm.Session, err error) {
+	eng, err := GetDB()
 	if err != nil {
-		panic(err)
-	} else {
-		return eng.NewSession()
+		return nil, err
 	}
+
+	session = eng.NewSession()
+	return session, nil
+
+}
+
+// GetDBConnection 获取连接对象
+func GetSaleExDb() (db *xorm.Engine, err error) {
+
+	//初始化对象
+	if EngineMap == nil || EngineMap["saleexdb"] == nil {
+		// 连接串是空的  重新执行数据库连接获取
+		InitConnections()
+	}
+	db = EngineMap["saleexdb"]
+	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
+	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
+
+	return db, err
 }
 
 // GetDBConnection 获取连接对象
@@ -304,14 +264,14 @@ func GetEasyTraDb() (db *xorm.Engine, err error) {
 }
 
 // GetDBConnection 获取连接对象
-func GetOcrDB() (db *xorm.Engine, err error) {
+func GetSaleSumDb() (db *xorm.Engine, err error) {
 
 	//初始化对象
-	if EngineMap == nil || EngineMap["ocrdb"] == nil {
+	if EngineMap == nil || EngineMap["salesumdb"] == nil {
 		// 连接串是空的  重新执行数据库连接获取
 		InitConnections()
 	}
-	db = EngineMap["ocrdb"]
+	db = EngineMap["salesumdb"]
 	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
 	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
 
@@ -319,8 +279,7 @@ func GetOcrDB() (db *xorm.Engine, err error) {
 }
 
 // 获取数据库连接对象，主从方式获取，根据传递的userid 确定从数据库连接
-// Engine调用一个SQL都会创建新的Session，完毕又会关闭Session， 多个SQL语句场景，非常消耗性能
-// 多个SQL语句场景，建议使用 GetSession 获取Session ，注意需要手动关闭 建议使用该方法关闭：defer session.Close()
+// xorm.Engine 不需要close
 func GetConnection(userid string, ismasterdb bool) (db *xorm.Engine, err error) {
 	if ismasterdb {
 		// 主数据库连接
@@ -331,19 +290,15 @@ func GetConnection(userid string, ismasterdb bool) (db *xorm.Engine, err error) 
 	}
 }
 
-/**
-业财融合数据库链接
-*/
-func GetBusFaDb() (db *xorm.Engine, err error) {
-
-	//初始化对象
-	if EngineMap == nil || EngineMap["busfadb"] == nil {
-		// 连接串是空的  重新执行数据库连接获取
-		InitConnections()
+// 获取数据库连接对象，主从方式获取，根据传递的userid 确定从数据库连接
+// 需要手动关闭连接
+func GetConnectionBySession(ismasterdb bool) (session *xorm.Session) {
+	db, err := GetConnection("", ismasterdb)
+	if err != nil {
+		panic(err)
 	}
-	db = EngineMap["busfadb"]
-	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
-	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
-
-	return db, err
+	if db == nil {
+		panic("数据库连接为空！")
+	}
+	return db.NewSession()
 }

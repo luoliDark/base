@@ -13,6 +13,8 @@ type SqlDataType struct {
 	DataType string
 	//长度
 	Length int
+	//长度
+	DecimalLength int
 }
 
 func (this SqlDataType) GetDatatype() string {
@@ -43,7 +45,7 @@ func (this *SqlDataType) getMysqlDatatype() string {
 	case "bit":
 		return "int(1)"
 	case "decimal": // 小数
-		return commutil.AppendStr(this.DataType, "(18,", commutil.ToString(this.Length), ")")
+		return commutil.AppendStr(this.DataType, "(18,", commutil.ToString(this.DecimalLength), ")")
 	default:
 		if this.Length > 0 {
 			return commutil.AppendStr(this.DataType, "(", commutil.ToString(this.Length), ")")

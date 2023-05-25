@@ -13,9 +13,6 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
-	"github.com/gogf/gf/frame/g"
-	"github.com/gogf/gf/util/gconv"
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/loghelper"
@@ -23,9 +20,14 @@ import (
 	"github.com/luoliDark/base/sysmodel/logtype"
 	"github.com/luoliDark/base/util/commutil"
 	"github.com/luoliDark/base/util/jsonutil"
+	"github.com/luoliDark/salecheck/model/enum"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-xorm/core"
+	"github.com/gogf/gf/frame/g"
+	"github.com/gogf/gf/util/gconv"
 	"github.com/xormplus/xorm"
 	xormplus_core "github.com/xormplus/xorm/core"
-	"xorm.io/core"
 )
 
 // 拼接sql 执行失败脚本
@@ -81,6 +83,19 @@ func QueryByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrArg
 	// 通用方法无需区分数据库类型
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	results, err := session.QueryString(sqlOrArgs...)
+	if err != nil {
+		var sqlError = concatErr(userID, err, sqlOrArgs...)
+		loghelper.ByError(logtype.QueryErr, sqlError, userID)
+		return nil, err
+	}
+	loghelper.EndTimeRecord(userID, "执行SQL", tim, sqlOrArgs...) //记录结束时间
+	return results, nil
+}
+
+func QueryInterfaceByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrArgs ...interface{}) ([]map[string]interface{}, error) {
+	// 通用方法无需区分数据库类型
+	tim := loghelper.BeginimeRecord() //记录开始时间
+	results, err := session.QueryInterface(sqlOrArgs...)
 	if err != nil {
 		var sqlError = concatErr(userID, err, sqlOrArgs...)
 		loghelper.ByError(logtype.QueryErr, sqlError, userID)
@@ -177,13 +192,12 @@ func QueryPagingByJson(userID string, IsMasterDB bool, orderBy string, pageIndex
 
 //执行SQL语句，
 func ExecSql(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (bool, error) {
-	if sqlOrArgs == nil || len(sqlOrArgs) == 0 {
-		return false, nil
-	}
+
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	db, _ := conn.GetConnection(userID, true)
 	_, err := db.Exec(sqlOrArgs...)
 	if err != nil {
+		fmt.Errorf("执行sql失败" + err.Error())
 		var sqlError = concatErr(userID, err, sqlOrArgs...)
 		loghelper.ByError(logtype.ExecSqlErr, sqlError, userID)
 		return false, err
@@ -198,6 +212,7 @@ func ExecSqlByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrA
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	_, err := session.Exec(sqlOrArgs...)
 	if err != nil {
+		fmt.Errorf("执行sql失败" + err.Error())
 		var sqlError = concatErr(userID, err, sqlOrArgs...)
 		loghelper.ByError(logtype.ExecSqlErr, sqlError, userID)
 		return false, err
@@ -207,14 +222,59 @@ func ExecSqlByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrA
 }
 
 //执行多条SQL语句，
-func ExecMoreSql(userID string, IsMasterDB bool, sqlList []string) (bool, error) {
+func ExecMoreSql(userID string, IsMasterDB bool, sqlList []string, dbname string) (bool, error) {
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	// 用事务执行多条SQL语句，，
 	if sqlList == nil || len(sqlList) == 0 {
 		// 没有可执行sql 直接返回 true
 		return true, nil
 	}
-	db, _ := conn.GetConnection(userID, true)
+	var db *xorm.Engine
+	if commutil.IsNullOrEmpty(dbname) {
+		engine, _ := conn.GetConnection(userID, true)
+		db = engine
+	} else if dbname == enum.ExSaleDb {
+		engine, _ := conn.GetSaleExDb()
+		db = engine
+	} else if dbname == enum.ExSaleSumDb {
+		engine, _ := conn.GetSaleSumDb()
+		db = engine
+	}
+
+	// 开启事务
+	session := db.NewSession()
+	defer session.Close()
+	err := session.Begin()
+	for _, value := range sqlList {
+		// 依次执行
+		_, err := session.Exec(value)
+		if err != nil {
+			// 执行失败 回滚，并且返回false，记录错误sql
+			var sqlError = concatErr(userID, err, value, "")
+			loghelper.ByError(logtype.ExecMoreSqlErr, sqlError, userID)
+			session.Rollback()
+			return false, err
+		}
+	}
+	// 所有都执行完成  提交事务
+	err = session.Commit()
+	if err != nil {
+		var sqlError = concatErr(userID, err, strings.Join(sqlList, ";"))
+		loghelper.ByError(logtype.ExecMoreSqlErr, sqlError, userID)
+		return false, err
+	}
+	loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlErr, tim, strings.Join(sqlList, ";")) //记录结束时间
+	return true, nil
+}
+
+func ExecSaleExDbMoreSql(userID string, sqlList []string) (bool, error) {
+	tim := loghelper.BeginimeRecord() //记录开始时间
+	// 用事务执行多条SQL语句，，
+	if sqlList == nil || len(sqlList) == 0 {
+		// 没有可执行sql 直接返回 true
+		return true, nil
+	}
+	db, _ := conn.GetSaleExDb()
 
 	// 开启事务
 	session := db.NewSession()
@@ -281,6 +341,33 @@ func ExecProc_ResultSetValue(userID string, IsMasterDB bool, ProcName string, Pr
 	return result, outValues, err
 }
 
+// QueryFirstCol 执行SQL查询，可传递参数，并返回首行首列
+// userID 用户ID
+// IsMasterDB 是否从masterDB读取，否则会自动选slave 库读取
+// SqlAndArgs 表示SQL语句和参数（参数为可选项 例 :  select * from xx where a=? ,123 就需要两个参数
+func QueryFirstCol(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (string, error) {
+
+	tim := loghelper.BeginimeRecord() //记录开始时间
+	if sqlOrArgs == nil || len(sqlOrArgs) == 0 {
+		// 没有传递sql
+		return "", nil
+	}
+	result := ""
+	var err error
+	switch confighelper.GetCurrdb() {
+	case "mysql":
+		result, err = queryFirstCol_mysql(userID, IsMasterDB, sqlOrArgs...)
+	case "mssql":
+		result, err = queryFirstCol_Sqlserver(userID, IsMasterDB, sqlOrArgs...)
+	default:
+		loghelper.ByHighError(logtype.NoDBErr, "请检查config.ini", userID)
+		panic("当前数据库未配置,请检查config.ini")
+	}
+	loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlErr, tim, sqlOrArgs...) //记录结束时间
+
+	return result, err
+}
+
 // QueryFirst 执行SQL查询，可传递参数，并返回首行
 // userID 用户ID
 // IsMasterDB 是否从masterDB读取，否则会自动选slave 库读取
@@ -335,33 +422,6 @@ func QueryFirstByTran(session *xorm.Session, userID string, IsMasterDB bool, sql
 // userID 用户ID
 // IsMasterDB 是否从masterDB读取，否则会自动选slave 库读取
 // SqlAndArgs 表示SQL语句和参数（参数为可选项 例 :  select * from xx where a=? ,123 就需要两个参数
-func QueryFirstCol(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (string, error) {
-
-	tim := loghelper.BeginimeRecord() //记录开始时间
-	if sqlOrArgs == nil || len(sqlOrArgs) == 0 {
-		// 没有传递sql
-		return "", nil
-	}
-	result := ""
-	var err error
-	switch confighelper.GetCurrdb() {
-	case "mysql":
-		result, err = queryFirstCol_mysql(userID, IsMasterDB, sqlOrArgs...)
-	case "mssql":
-		result, err = queryFirstCol_Sqlserver(userID, IsMasterDB, sqlOrArgs...)
-	default:
-		loghelper.ByHighError(logtype.NoDBErr, "请检查config.ini", userID)
-		panic("当前数据库未配置,请检查config.ini")
-	}
-	loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlErr, tim, sqlOrArgs...) //记录结束时间
-
-	return result, err
-}
-
-// QueryFirstCol 执行SQL查询，可传递参数，并返回首行首列
-// userID 用户ID
-// IsMasterDB 是否从masterDB读取，否则会自动选slave 库读取
-// SqlAndArgs 表示SQL语句和参数（参数为可选项 例 :  select * from xx where a=? ,123 就需要两个参数
 func QueryFirstColByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (string, error) {
 
 	tim := loghelper.BeginimeRecord() //记录开始时间
@@ -386,7 +446,7 @@ func QueryFirstColByTran(session *xorm.Session, userID string, IsMasterDB bool, 
 }
 
 //在指定事务中执行SQL语句，并且不进行commit ，也不能rollback
-func ExecSqlByTransaction(userID string, connSession xorm.Session, sqlOrArgs ...interface{}) (bool, error) {
+func ExecSqlByTransaction(userID string, connSession *xorm.Session, sqlOrArgs ...interface{}) (bool, error) {
 
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	_, err := connSession.Exec(sqlOrArgs...)
@@ -400,7 +460,7 @@ func ExecSqlByTransaction(userID string, connSession xorm.Session, sqlOrArgs ...
 }
 
 //执行多条SQL语句，
-func ExecMoreSqlByTransaction(userID string, connSession *xorm.Session, sqlList []string) (bool, error) {
+func ExecMoreSqlByTransaction(userID string, connSession xorm.Session, sqlList []string) (bool, error) {
 
 	tim := loghelper.BeginimeRecord() //记录开始时间
 	if len(sqlList) == 0 {
@@ -440,6 +500,44 @@ func ExecProcInTran_OutParamValue(session *xorm.Session, userID string, IsMaster
 	return nil, nil
 }
 
+//查询出数据并返回 map[map] 对象
+//keyFields map对象的key生成字段 可以多个例：deptid,itemid
+func QueryByMap(keyFields string, sqlOrArgs ...interface{}) (map[string]map[string]string, error) {
+
+	// 通用方法无需区分数据库类型
+	tim := loghelper.BeginimeRecord() //记录开始时间
+	engine, _ := conn.GetConnection("", true)
+	results, err := engine.QueryString(sqlOrArgs...)
+
+	if err != nil {
+		var sqlError = concatErr("", err, sqlOrArgs...)
+		loghelper.ByError(logtype.QueryErr, sqlError, "")
+		return nil, err
+	}
+
+	loghelper.EndTimeRecord("", "执行SQL", tim, sqlOrArgs...) //记录结束时间
+
+	keyCollArr := strings.Split(keyFields, ",")
+
+	cnt := len(keyCollArr)
+	resultMap := make(map[string]map[string]string)
+	for _, row := range results {
+		key := ""
+		for index, col := range keyCollArr {
+			key += row[col]
+			if index < cnt-1 {
+				key += "_"
+			}
+		}
+		_, ok := resultMap[key]
+		if ok {
+			return nil, errors.New(key + "出现维度重复数据，请检查")
+		}
+		resultMap[key] = row
+	}
+	return resultMap, nil
+}
+
 //根据传入数据及表信息，获取insert 语句
 //tableInfo 表对象信息 需要对tabletype表类型 进行说明
 //userID 用户ID 可为空
@@ -472,7 +570,7 @@ func BatchInsertByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 			continue
 		}
 
-		if (tableInfo.IsIdentity || tableInfo.GridID > 0) && (tableInfo.IsIdentity && k == tableInfo.PrimaryKey) {
+		if (tableInfo.IsIdentity) && k == tableInfo.PrimaryKey {
 			continue
 		}
 
@@ -483,15 +581,15 @@ func BatchInsertByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 
 	//数据中是否有外健
 	var isHaveFk bool = false
-	tmp, ok := firstRow[tableInfo.ForeignKey]
-	if ok && !g.IsEmpty(tmp) {
+	_, ok := firstRow[tableInfo.ForeignKey]
+	if ok {
 		isHaveFk = true
 	}
 
 	// insertdate
 	bufferSql.WriteString("insertdate")
 
-	bufferSql.WriteString(",entid")
+	//bufferSql.WriteString(",entid")
 
 	//pid or griid
 	if tableInfo.GridID > 0 {
@@ -566,7 +664,148 @@ func BatchInsertByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 		if isReset {
 
 			insertSql := prefixSql + bufferInsertSql.String()
-			//fmt.Println(insertSql)
+			fmt.Println(insertSql)
+			_, err := session.Exec(insertSql)
+			if err != nil {
+				var sqlError = concatErr(userID, err, insertSqls)
+				loghelper.ByError(logtype.BatchInsertErr, sqlError, userID)
+				return false, err
+			}
+			bufferInsertSql.Reset()
+			isReset = false
+		}
+
+	}
+	loghelper.EndTimeRecord(userID, logtype.BatchInsertErr, tim, commutil.AppendStr(prefixSql, "数据条数：", commutil.ToString(len(rows)))) //记录结束时间
+	return true, nil
+}
+
+//根据传入数据及表信息，获取insert 语句
+//tableInfo 表对象信息 需要对tabletype表类型 进行说明
+//userID 用户ID 可为空
+//PrimaryKey 主健value或外健值 例：某个 Billid 可为空
+//rows 注：传入的数据类型必须为[]map[string]string
+//newGuid批次号，每次插表都要有唯一的批次
+func BatchInsertByTransactionByString(tableInfo sysmodel.SqlTableStruct, session *xorm.Session, rows []map[string]string, userID string, ForeignKeyVal string, newGuid string, entid string) (bool, error) {
+
+	//非空检查
+	if rows == nil || len(rows) == 0 {
+		return true, nil
+	}
+
+	tim := loghelper.BeginimeRecord() //记录开始时间
+
+	//生成insert sql pre前缀语句
+	var bufferSql bytes.Buffer
+	bufferSql.WriteString("insert into ")
+	bufferSql.WriteString(tableInfo.TableName)
+	bufferSql.WriteString("(")
+
+	//字段清单
+	firstRow := rows[0]
+	colArr := make([]string, 0, len(firstRow))
+
+	for k, _ := range firstRow {
+
+		//过虑不需要保存的字段 只限表单保存
+		if tableInfo.Pid > 0 && (k == "row_id" || k == "rowstate" || strings.Index(k, "_show") != -1) {
+			continue
+		}
+
+		if (tableInfo.IsIdentity || tableInfo.GridID > 0) && k == tableInfo.PrimaryKey {
+			continue
+		}
+
+		colArr = append(colArr, k)
+		bufferSql.WriteString(k)
+		bufferSql.WriteString(",")
+	}
+
+	//数据中是否有外健
+	var isHaveFk bool = false
+	_, ok := firstRow[tableInfo.ForeignKey]
+	if ok {
+		isHaveFk = true
+	}
+
+	// insertdate
+	bufferSql.WriteString("insertdate")
+
+	//pid or griid
+	if tableInfo.GridID > 0 {
+		bufferSql.WriteString(",entid")
+		bufferSql.WriteString(",currgridid")
+		bufferSql.WriteString(",currpid")
+		if !isHaveFk && tableInfo.ForeignKey != "" {
+			bufferSql.WriteString(",")
+			bufferSql.WriteString(tableInfo.ForeignKey)
+		}
+
+	}
+
+	bufferSql.WriteString(") values ")
+	prefixSql := bufferSql.String()
+
+	// 遍历执行 注：每600行会先插入一次
+	isReset := false
+	insertCnt := 0
+	var insertSqls string
+	var bufferInsertSql bytes.Buffer
+	for currInd, oneRow := range rows {
+
+		bufferInsertSql.WriteString("(")
+		for _, col := range colArr {
+			val := oneRow[col]
+			if val == "" {
+				bufferInsertSql.WriteString("NULL")
+			} else {
+				bufferInsertSql.WriteString("'")
+				bufferInsertSql.WriteString(commutil.ToString(val))
+				bufferInsertSql.WriteString("'")
+			}
+			bufferInsertSql.WriteString(",")
+		}
+
+		//insertDate
+		bufferInsertSql.WriteString("'")
+		bufferInsertSql.WriteString(time.Now().Format(commutil.Time_Fomat01))
+		bufferInsertSql.WriteString("'")
+		//pidOrGrid
+		if tableInfo.GridID > 0 {
+			bufferInsertSql.WriteString(",")
+			bufferInsertSql.WriteString(entid)
+			bufferInsertSql.WriteString(",")
+			bufferInsertSql.WriteString(commutil.ToString(tableInfo.GridID))
+			bufferInsertSql.WriteString(",")
+			bufferInsertSql.WriteString(commutil.ToString(tableInfo.Pid))
+
+			//外健
+			if !isHaveFk && tableInfo.ForeignKey != "" {
+				bufferInsertSql.WriteString(",'")
+				bufferInsertSql.WriteString(ForeignKeyVal)
+				bufferInsertSql.WriteString("'")
+			}
+
+		}
+
+		bufferInsertSql.WriteString(")")
+
+		insertCnt++
+
+		if insertCnt >= 600 || currInd == len(rows)-1 {
+			isReset = true
+			insertCnt = 0
+		}
+
+		if !isReset {
+			bufferInsertSql.WriteString(",")
+		}
+
+		//达到600条先进行一次提交
+		if isReset {
+
+			insertSql := prefixSql + bufferInsertSql.String()
+			fmt.Println(insertSql)
 			_, err := session.Exec(insertSql)
 			if err != nil {
 				var sqlError = concatErr(userID, err, insertSqls)
@@ -615,7 +854,7 @@ func BatchUpdateByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 
 	//用于分拼处理记录起始位置 每次更新300条
 	rowsCnt := len(rows)
-	for startIndex := 0; startIndex <= rowsCnt; {
+	for startIndex := 0; startIndex < rowsCnt; { // 2022-03-23 修改300条时候多执行bug  原: startIndex <= rowsCnt
 
 		colCnt := 0
 		//遍历每个字段，为其拼case when
@@ -687,7 +926,7 @@ func BatchUpdateByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 		bufferUpdateSql.WriteString(strings.TrimRight(primaryKeyBuffer.String(), ","))
 		bufferUpdateSql.WriteString(" )")
 		upSql := bufferUpdateSql.String()
-		//fmt.Println(upSql)
+		fmt.Println(upSql)
 		_, err := session.Exec(upSql)
 		if err != nil {
 			loghelper.ByError(logtype.BatchUpdateErr, tableInfo.TableName+upSql+err.Error(), userID)
@@ -707,9 +946,8 @@ func BatchUpdateByTransaction(tableInfo sysmodel.SqlTableStruct, session *xorm.S
 //PrimaryKey主健ID 注：只用于更新主表时可用，更新子表只根据detailid更新
 func BatchUpdateByTransactionByMapString(tableInfo sysmodel.SqlTableStruct, session *xorm.Session, rows []map[string]string, userID string) (bool, error) {
 
-	rowsLen := len(rows)
 	//非空检查
-	if rows == nil || rowsLen == 0 {
+	if rows == nil || len(rows) == 0 {
 		return true, nil
 	}
 
@@ -720,7 +958,7 @@ func BatchUpdateByTransactionByMapString(tableInfo sysmodel.SqlTableStruct, sess
 	colMap := make(map[string]*bytes.Buffer, 0)
 
 	for k, _ := range firstRow {
-		if k == tableInfo.PrimaryKey {
+		if tableInfo.PrimaryKey == k {
 			continue
 		}
 		//过虑不需要保存的字段 只限表单保存
@@ -738,36 +976,11 @@ func BatchUpdateByTransactionByMapString(tableInfo sysmodel.SqlTableStruct, sess
 
 	//用于分拼处理记录起始位置 每次更新300条
 	rowsCnt := len(rows)
-	for startIndex := 0; startIndex <= rowsCnt; {
+	for startIndex := 0; startIndex < rowsCnt; { // 2022-03-23 修改300条时候多执行bug  原: startIndex <= rowsCnt
 
 		colCnt := 0
 		//遍历每个字段，为其拼case when
 		for col, buf := range colMap {
-			if rowsLen == 1 {
-				buf.WriteString(col)
-				buf.WriteString("=")
-				oneRow := rows[0]
-				val := oneRow[col]
-				if val != "" {
-					buf.WriteString(" '")
-					buf.WriteString(val)
-					buf.WriteString("' ")
-				} else {
-					buf.WriteString(" NULL ")
-				}
-				if colCnt == 0 {
-					if tableInfo.IsStringByPrimaryKey {
-						primaryKeyBuffer.WriteString("'")
-						primaryKeyBuffer.WriteString(oneRow[tableInfo.PrimaryKey])
-						primaryKeyBuffer.WriteString("'")
-					} else {
-						primaryKeyBuffer.WriteString(oneRow[tableInfo.PrimaryKey])
-					}
-					primaryKeyBuffer.WriteString(",")
-					colCnt++
-				}
-				continue
-			}
 
 			buf.WriteString(col)
 			buf.WriteString("=case ")
@@ -842,7 +1055,7 @@ func BatchUpdateByTransactionByMapString(tableInfo sysmodel.SqlTableStruct, sess
 		bufferUpdateSql.WriteString(strings.TrimRight(primaryKeyBuffer.String(), ","))
 		bufferUpdateSql.WriteString(" )")
 		upSql := bufferUpdateSql.String()
-		//fmt.Println(upSql)
+		fmt.Println(upSql)
 		_, err := session.Exec(upSql)
 		if err != nil {
 			loghelper.ByError(logtype.BatchUpdateErr, tableInfo.TableName+upSql+err.Error(), userID)
@@ -985,7 +1198,7 @@ func BatchUpdateByTransactionByMorePrimarykeys(MorePrimarykeys []string, tableIn
 		//bufferUpdateSql.WriteString(" in (")
 		//bufferUpdateSql.WriteString(" )")
 		upSql := bufferUpdateSql.String()
-		//fmt.Println(upSql)
+		fmt.Println(upSql)
 		_, err := session.Exec(upSql)
 		if err != nil {
 			loghelper.ByError(logtype.BatchUpdateErr, tableInfo.TableName+upSql+err.Error(), userID)
@@ -1042,7 +1255,6 @@ func BatchInsertByMapString(tabName string, session *xorm.Session, rows []map[st
 	// 遍历执行 注：每600行会先插入一次
 	isReset := false
 	insertCnt := 0
-	oneInsertMaxRowCnt := 600
 	var insertSqls string
 	var bufferInsertSql bytes.Buffer
 	for currInd, oneRow := range rows {
@@ -1069,7 +1281,7 @@ func BatchInsertByMapString(tabName string, session *xorm.Session, rows []map[st
 
 		insertCnt++
 
-		if insertCnt >= oneInsertMaxRowCnt || currInd == len(rows)-1 {
+		if insertCnt >= 600 || currInd == len(rows)-1 {
 			isReset = true
 			insertCnt = 0
 		}
@@ -1082,7 +1294,7 @@ func BatchInsertByMapString(tabName string, session *xorm.Session, rows []map[st
 		if isReset {
 
 			insertSql := prefixSql + bufferInsertSql.String()
-			//fmt.Println(insertSql)
+			fmt.Println(insertSql)
 			_, err := session.Exec(insertSql)
 			if err != nil {
 				var sqlError = concatErr(userID, err, insertSqls)
@@ -1112,141 +1324,60 @@ func GetIFNull() string {
 }
 
 // 解析前台ajax传递的查询字段，并转为sql及查询参数
-func GetFilterSql(lstQueryField []sysmodel.QueryField, IsOpenRealCtr bool, pid int, isParamsTran bool) (filterSql string, queryPars []interface{}) {
+func GetFilterSql(lstQueryField []sysmodel.QueryField) (filterSql string, queryPars []interface{}) {
 	queryPars = make([]interface{}, 0)
 	var bufferWhere bytes.Buffer
 	isfirst := true
 	for _, entity := range lstQueryField {
-		if g.IsEmpty(entity.KeyWord) {
+		if g.IsEmpty(entity.KeyWord) || strings.HasSuffix(entity.FieldName, "_show") {
 			continue
 		}
 		if !isfirst {
 			bufferWhere.WriteString(" and ")
 		}
 		isfirst = false
-		//50508 表示凭证导入界面
-		//50504 快捷付款 (员工 、供应商）
-		//50609  快捷付款 (汇票)
-		isSelectReal := !strings.Contains(entity.Op, "like") && (entity.FieldName == "billno" || entity.FieldName == "realnumber") && (IsOpenRealCtr || pid == 50508 || pid == 50504 || pid == 50609)
-		GetFilterParamsToListSelect(&entity, isParamsTran)
-		if isSelectReal {
-			//单据启用了信封号功能 ，需要将两个字段联合查询
-			var billno, realnumber string
-			if strings.Contains(entity.FieldName, "billno") {
-				realnumber = strings.ReplaceAll(entity.FieldName, "billno", "realnumber")
-				billno = entity.FieldName
-			} else {
-				billno = strings.ReplaceAll(entity.FieldName, "realnumber", "billno")
-				realnumber = entity.FieldName
-			}
+		bufferWhere.WriteString(" ")
+		bufferWhere.WriteString(entity.FieldName)
+		bufferWhere.WriteString(" ")
+		bufferWhere.WriteString(entity.Op)
 
-			if entity.Op == "in" || entity.Op == "not in" {
-				var inBuffer strings.Builder
-				inBuffer.WriteString(" (")
-				lst := strings.Split(entity.KeyWord, ",")
-				// queryPars2 用于分割流水号在不同占位符，否则直接添加在 queryPars
-				// 查询1,2 会变成 billno in (1,1) or realnumber in (2,2)
-				var queryPars2 []interface{}
-				isfirstcol := true
-				for _, s := range lst {
-					if s == "" || strings.Trim(s, " ") == "" {
-						continue
-					}
-					if !isfirstcol {
-						inBuffer.WriteString(",")
-					}
-					isfirstcol = false
-					queryPars = append(queryPars, s)   // 两个字段 需要复制一个 s
-					queryPars2 = append(queryPars2, s) // 两个字段 需要复制一个 s
-					inBuffer.WriteString("?")
+		if entity.Op == "in" || entity.Op == "not in" {
+			bufferWhere.WriteString(" (")
+			lst := strings.Split(entity.KeyWord, ",")
+			isfirstcol := true
+			for _, s := range lst {
+				if s == "" || strings.Trim(s, " ") == "" {
+					continue
 				}
-				queryPars = append(queryPars, queryPars2...)
-				inBuffer.WriteString(" )")
-				bufferWhere.WriteString(" (")
-
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(billno)
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(entity.Op)
-				bufferWhere.WriteString(inBuffer.String())
-
-				bufferWhere.WriteString(" or ")
-				bufferWhere.WriteString(realnumber)
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(entity.Op)
-				bufferWhere.WriteString(inBuffer.String())
-
-				bufferWhere.WriteString(" )")
-
-			} else {
-				bufferWhere.WriteString(" (")
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(billno)
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(entity.Op)
-				bufferWhere.WriteString(" ? ")
-
-				bufferWhere.WriteString(" or ")
-
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(realnumber)
-				bufferWhere.WriteString(" ")
-				bufferWhere.WriteString(entity.Op)
-				bufferWhere.WriteString(" ? ")
-
-				bufferWhere.WriteString(" )")
-
-				queryPars = append(queryPars, entity.KeyWord) // 两个字段 需要复制一个 s
-				queryPars = append(queryPars, entity.KeyWord)
+				if !isfirstcol {
+					bufferWhere.WriteString(",")
+				}
+				isfirstcol = false
+				queryPars = append(queryPars, s)
+				bufferWhere.WriteString("?")
 			}
-
-			continue
-
+			bufferWhere.WriteString(" )")
 		} else {
-
-			bufferWhere.WriteString(" ")
-			bufferWhere.WriteString(entity.FieldName)
-			bufferWhere.WriteString(" ")
-			bufferWhere.WriteString(entity.Op)
-
-			if entity.Op == "in" || entity.Op == "not in" {
-				bufferWhere.WriteString(" (")
-				lst := strings.Split(entity.KeyWord, ",")
-				isfirstcol := true
-				for _, s := range lst {
-					if s == "" || strings.Trim(s, " ") == "" {
-						continue
-					}
-					if !isfirstcol {
-						bufferWhere.WriteString(",")
-					}
-					isfirstcol = false
-					queryPars = append(queryPars, s)
-					bufferWhere.WriteString("?")
-				}
-				bufferWhere.WriteString(" )")
+			// %3232%
+			if entity.Op == "like" || entity.Op == "not like" {
+				bufferWhere.WriteString("?")
 			} else {
-				// %3232%
-				if entity.Op == "like" || entity.Op == "not like" {
-					bufferWhere.WriteString("?")
+				bufferWhere.WriteString(" ? ")
+			}
+			if entity.Op == "<" || entity.Op == "<=" || entity.Op == ">" || entity.Op == ">=" {
+				if strings.Contains(entity.SqlDatatype, "int") {
+					queryPars = append(queryPars, commutil.ToInt64(entity.KeyWord))
+				} else if strings.Contains(entity.SqlDatatype, "float") {
+					queryPars = append(queryPars, commutil.ToFloat64(entity.KeyWord))
+				} else if strings.Contains(entity.SqlDatatype, "decimal") {
+					queryPars = append(queryPars, commutil.ToFloat64(entity.KeyWord))
 				} else {
-					bufferWhere.WriteString(" ? ")
-				}
-				if entity.Op == "<" || entity.Op == "<=" || entity.Op == ">" || entity.Op == ">=" {
-					if strings.Contains(entity.SqlDatatype, "int") {
-						queryPars = append(queryPars, commutil.ToInt64(entity.KeyWord))
-					} else if strings.Contains(entity.SqlDatatype, "float") {
-						queryPars = append(queryPars, commutil.ToFloat64(entity.KeyWord))
-					} else if strings.Contains(entity.SqlDatatype, "decimal") {
-						queryPars = append(queryPars, commutil.ToFloat64(entity.KeyWord))
-					} else {
-						//其它类型 例：date varchar
-						queryPars = append(queryPars, entity.KeyWord)
-					}
-
-				} else {
+					//其它类型 例：date varchar
 					queryPars = append(queryPars, entity.KeyWord)
 				}
+
+			} else {
+				queryPars = append(queryPars, entity.KeyWord)
 			}
 		}
 
@@ -1256,65 +1387,6 @@ func GetFilterSql(lstQueryField []sysmodel.QueryField, IsOpenRealCtr bool, pid i
 	} else {
 		return "", nil
 	}
-}
-
-//先使用map存储需要支持分割查询的字段 , 待后面支持多组合条件查询 时再取消
-var listMapSelect = map[string]interface{}{
-	"billno": nil, "sourcebillno": nil, "realnumber": nil, "pid": nil,
-	"csid": nil, "cscode": nil, "csname": nil,
-	"costid": nil, "costname": nil, "costcode": nil,
-	"deptid": nil, "deptcode": nil, "deptname": nil, "storecode": nil,
-	"userid": nil, "username": nil, "usercode": nil,
-	"centerid": nil, "centercode": nil, "centername": nil,
-	"codeid": nil, "code": nil, "codename": nil,
-}
-
-// like = 比较符号 转成list查询 tran 是否转换
-func GetFilterParamsToListSelect(field *sysmodel.QueryField, tran bool) (isToListSelect bool) {
-	FieldName := strings.ToLower(field.FieldName)
-	if field.Op == "" || field.KeyWord == "" || strings.Contains(FieldName, "memo") {
-		return isToListSelect
-	}
-	//是否转 in 查询， 空格或,逗号拆分时
-	if field.Op == "like" || field.Op == "=" {
-		sep1 := strings.Contains(field.KeyWord, ",")
-		sep2 := strings.Contains(field.KeyWord, " ")
-		if !sep1 && !sep2 {
-			if field.Op == "like" {
-				if !strings.Contains(field.KeyWord, "%") {
-					field.KeyWord = "%" + field.KeyWord + "%"
-				}
-			}
-			return isToListSelect
-		}
-		if tran {
-			sepStr := ","
-			if sep2 {
-				sepStr = " "
-			}
-			field.Op = "in"
-			if sep2 {
-				field.KeyWord = strings.ReplaceAll(field.KeyWord, sepStr, ",")
-			}
-			//替换 %  ， 空格替换为, 查询
-			field.KeyWord = strings.ReplaceAll(field.KeyWord, "%", "")
-			isToListSelect = true
-		} else {
-			// 列表页或拷贝页 打开界面，部分字段支持分割查询
-			FieldName = strings.ReplaceAll(FieldName, "billmain.", "")
-			FieldName = strings.ReplaceAll(FieldName, "detail.", "")
-			FieldName = strings.ReplaceAll(FieldName, "basemain.", "")
-			FieldName = strings.ReplaceAll(FieldName, "main.", "")
-			if _, isok := listMapSelect[FieldName]; !isok {
-				return isToListSelect
-			}
-			field.Op = "in"
-			//替换 %  ， 空格替换为, 查询
-			field.KeyWord = strings.ReplaceAll(field.KeyWord, "%", "")
-			isToListSelect = true
-		}
-	}
-	return isToListSelect
 }
 
 func row2mapStr(rows *sql.Rows, fields []string) (resultsMap map[string]string, err error) {
@@ -1425,31 +1497,6 @@ func SelectMaxPrimaryKey(userID string, pkCount int, tableName string) (maxPrima
 	return maxPrimary
 }
 
-func QueryMap(userID string, IsMasterDB bool, keyStr string, valueStr string, sqlOrArgs ...interface{}) (map[string]string, error) {
-
-	// 通用方法无需区分数据库类型
-	tim := loghelper.BeginimeRecord() //记录开始时间
-	engine, _ := conn.GetConnection(userID, IsMasterDB)
-	results, err := engine.QueryString(sqlOrArgs...)
-
-	if err != nil {
-		var sqlError = concatErr(userID, err, sqlOrArgs...)
-		loghelper.ByError(logtype.QueryErr, sqlError, userID)
-		return nil, err
-	}
-	result := make(map[string]string, 0)
-	for _, row := range results {
-		keyValue := row[keyStr]
-		value := row[valueStr]
-		result[keyValue] = value
-	}
-
-	loghelper.EndTimeRecord(userID, "执行SQL", tim, sqlOrArgs...) //记录结束时间
-	return result, nil
-}
-
-//sqlOrArgs 查询sql和参数， 返回map[string]map[string]string
-//keyStr 作为map[string]的主键  map[string]string 是数据行
 func QueryMapByKeyMap(userID string, IsMasterDB bool, keyStr string, sqlOrArgs ...interface{}) (map[string]map[string]string, error) {
 	// 通用方法无需区分数据库类型
 	tim := loghelper.BeginimeRecord() //记录开始时间
@@ -1470,7 +1517,7 @@ func QueryMapByKeyMap(userID string, IsMasterDB bool, keyStr string, sqlOrArgs .
 	}
 	compareFieldByMap := make(map[string]map[string]string)
 	for rows.Next() {
-		err = row2listmapStrByKeyCol(rows, columns, keyStr, compareFieldByMap)
+		err := row2listmapStrByKeyCol(rows, columns, keyStr, compareFieldByMap)
 		if err != nil {
 			return nil, err
 		}

@@ -12,11 +12,11 @@ import (
 
 //表单管理字段确定好以后 创建表结构
 //uniqueCol 为唯一索引或联合唯一健 多个字段以逗号分隔
-func CreateTable(userID string, tableName string, pkCol string, pkIsIdentity bool, uniqueCol string, fields []sysmodel.SqlField, IsForm bool) bool {
+func CreateTable(userID string, tableName string, pkCol string, pkIsIdentity bool, uniqueCol string, fields []sysmodel.SqlField, IsForm bool, dbname string) bool {
 
 	switch confighelper.GetCurrdb() {
 	case conn.DBTYPE_MYSQL:
-		return createTable_mysql(userID, tableName, pkCol, pkIsIdentity, uniqueCol, fields, IsForm)
+		return createTable_mysql(userID, tableName, pkCol, pkIsIdentity, uniqueCol, fields, IsForm, dbname)
 	case conn.DBTYPE_SQLSERVER:
 		return createTable_sqlserver(userID, tableName, pkCol, pkIsIdentity, uniqueCol, fields, IsForm)
 	default:
@@ -26,14 +26,14 @@ func CreateTable(userID string, tableName string, pkCol string, pkIsIdentity boo
 }
 
 //检查表是否存在
-func TableIsExists(tableName string) bool {
+func TableIsExists(userID string, tableName string, dbName string) bool {
 	switch confighelper.GetCurrdb() {
 	case conn.DBTYPE_MYSQL:
-		return tableIsExists_mysql("", tableName)
+		return tableIsExists_mysql(userID, tableName, dbName)
 	case conn.DBTYPE_SQLSERVER:
-		return tableIsExists_sqlserver("", tableName)
+		return tableIsExists_sqlserver(userID, tableName)
 	default:
-		loghelper.ByHighError(logtype.CreateTableErr, "currdb配置错误", "")
+		loghelper.ByHighError(logtype.CreateTableErr, "currdb配置错误", userID)
 		panic("建表错误currdb配置错误")
 	}
 }
@@ -129,17 +129,11 @@ func GetProcParList(userID string, procNmae string) []sysmodel.ProcPar {
 	}
 }
 
-//根据表结构复制一张新表
-func CreateTableByTableNameIsIdentity(tableName string, newTableName string, plIsIdentity bool) {
-	structs := GetSqlTableStruct("1", tableName)
-	CreateTable("1", newTableName, "id", plIsIdentity, "id", structs.ColList, false)
-}
-
 //获取某张表的结构信息
-func GetSqlTableStruct(userID string, sqlTableName string) sysmodel.SqlTableStruct {
+func GetSqlTableStruct(userID string, sqlTableName string, dbName string) sysmodel.SqlTableStruct {
 	switch confighelper.GetCurrdb() {
 	case conn.DBTYPE_MYSQL:
-		return getSqlTableStruct_mysql(userID, sqlTableName)
+		return getSqlTableStruct_mysql(userID, sqlTableName, dbName)
 	case conn.DBTYPE_SQLSERVER:
 		return getSqlTableStruct_sqlserver(userID, sqlTableName)
 	default:

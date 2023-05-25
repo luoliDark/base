@@ -12,6 +12,7 @@ const EventLog = "EventLog"     //系统事件执行LOG
 const VoucherLog = "VoucherLog" //凭证相关LOG
 const PayLog = "PayLog"         //付款相关LOG
 const ExWfLog = "ExWfLog"       //外部工作流LOG
+const BudLog = "BudLog"         //外部工作流LOG
 
 //DB LOG 对象
 type DBLogEntity struct {
@@ -55,6 +56,8 @@ func InsertLog(entity *DBLogEntity) {
 		sqlTable = "log_pay"
 	case ExWfLog:
 		sqlTable = "log_exwf"
+	case BudLog:
+		sqlTable = "log_bud"
 	}
 
 	insertE := insertEntity{
@@ -67,47 +70,18 @@ func InsertLog(entity *DBLogEntity) {
 		Action:     entity.Action,
 		OpUserId:   entity.OpUserId,
 	}
-
 	if entity.IsSuccess {
 		insertE.IsSuccess = 1
 	}
 
 	go func(entity *insertEntity, sqlTable string) {
 
-		session := conn.GetSession(true)
-		defer session.Close()
-
-		_, _ = session.Table(sqlTable).Insert(entity)
+		session, err := conn.GetSession()
+		if err == nil {
+			defer session.Close()
+			_, _ = session.Table(sqlTable).Insert(entity)
+		}
 
 	}(&insertE, sqlTable)
-
-}
-
-//删除历史LOG数据
-func DelHistoryLog() {
-
-	session := conn.GetSession(true)
-	defer session.Close()
-
-	sqlTable := "log_sysevent"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_syssave"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_sysdelete"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_sysapi"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_voucher"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_pay"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
-
-	sqlTable = "log_exwf"
-	_, _ = session.Exec("Delete From " + sqlTable + " where ver <date_add(NOW(), interval -12 month); ")
 
 }

@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/sysmodel/logtype"
 	"github.com/luoliDark/base/util/commutil"
 	"github.com/luoliDark/base/util/jsonutil"
+
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/xormplus/xorm"
 )
 
@@ -96,6 +97,35 @@ func queryPagingByJson_mysql(userID string, IsMasterDB bool, orderBy string, pag
 	return json, nil
 }
 
+//查询首行首列
+func queryFirstCol_mysql(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (result string, err error) {
+
+	sql := commutil.ToString(sqlOrArgs[0])
+
+	sqlOrArgs[0] = sql + " limit 1 "
+
+	db, err := conn.GetConnection(userID, IsMasterDB)
+	if err != nil {
+
+		return "", err
+	}
+
+	rows, err := db.QueryString(sqlOrArgs...)
+	if err != nil {
+		loghelper.ByError(logtype.QueryErr, commutil.AppendStr(err.Error(), sqlOrArgs[0]), userID)
+		return "", err
+	}
+
+	if len(rows) > 0 {
+		for _, v := range rows[0] {
+			return v, nil
+		}
+	} else {
+		return "", nil
+	}
+	return "", nil
+}
+
 //查询首行
 func queryFirst_mysql(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (result map[string]string, err error) {
 
@@ -140,35 +170,6 @@ func queryFirst_mysqlTran(session *xorm.Session, userID string, IsMasterDB bool,
 	} else {
 		return nil, nil
 	}
-}
-
-//查询首行首列
-func queryFirstCol_mysql(userID string, IsMasterDB bool, sqlOrArgs ...interface{}) (result string, err error) {
-
-	sql := commutil.ToString(sqlOrArgs[0])
-
-	sqlOrArgs[0] = sql + " limit 1 "
-
-	db, err := conn.GetConnection(userID, IsMasterDB)
-	if err != nil {
-
-		return "", err
-	}
-
-	rows, err := db.QueryString(sqlOrArgs...)
-	if err != nil {
-		loghelper.ByError(logtype.QueryErr, commutil.AppendStr(err.Error(), sqlOrArgs[0]), userID)
-		return "", err
-	}
-
-	if len(rows) > 0 {
-		for _, v := range rows[0] {
-			return v, nil
-		}
-	} else {
-		return "", nil
-	}
-	return "", nil
 }
 
 //查询首行首列

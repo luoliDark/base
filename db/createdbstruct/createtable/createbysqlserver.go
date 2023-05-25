@@ -45,7 +45,7 @@ func createTable_sqlserver(userID string, tableName string, pkCol string, pkIsId
 		listSql = append(listSql, idx_buffer.String())
 	}
 	// 执行批量sql
-	success, _ = dbhelper.ExecMoreSql(userID, true, listSql)
+	success, _ = dbhelper.ExecMoreSql(userID, true, listSql, "")
 	return success
 }
 
@@ -211,7 +211,7 @@ func addField_sqlserver(userID string, tableName string, fields []sysmodel.SqlFi
 		}
 		sqlList[index] = sql
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 	return false
 }
@@ -223,7 +223,7 @@ func dropField_sqlserver(userID string, tableName string, fields []sysmodel.SqlF
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " drop column ", field.ColName)
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 }
 
@@ -234,7 +234,7 @@ func alterField_sqlserver(userID string, tableName string, fields []sysmodel.Sql
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " alter column ", concatSqlServerFieldDefine(field))
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 	return false
 }

@@ -3,12 +3,12 @@ package logserverconn
 import (
 	"bytes"
 
-	_ "github.com/denisenkom/go-mssqldb"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/luoliDark/base/confighelper"
-	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/util/commutil"
 	_ "github.com/luoliDark/base/util/commutil"
+
+	_ "github.com/denisenkom/go-mssqldb"
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/xormplus/xorm"
 )
 
@@ -27,8 +27,7 @@ func InitConnections() {
 	database := confighelper.GetIniConfig("logserver", "database")
 
 	if server == "" || username == "" || password == "" || database == "" {
-		loghelper.ByError("连接DB失败"+database, "连接数据库失败，服务器地址或账号密码未设置", "")
-		return
+		panic("连接数据库失败，服务器地址或账号密码未设置")
 	}
 
 	var currDbUrl string

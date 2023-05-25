@@ -4,17 +4,21 @@ import (
 	"bytes"
 	"strings"
 
+	"github.com/luoliDark/base/db/enum"
+
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/db/dbhelper"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/util/commutil"
+
+	"github.com/xormplus/xorm"
 )
 
 //表单管理字段确定好以后 创建表结构
 //uniqueCol 为唯一索引或联合唯一健 多个字段以逗号分隔
 // 增加 IsForm 是否是业务表单类型表创建，是的话，自动增加Year 字段，存储年份，实现数据分片存储
 func createTable_mysql(userID string, tableName string, pkCol string, pkIsIdentity bool, uniqueCol string,
-	fields []sysmodel.SqlField, IsForm bool) (success bool) {
+	fields []sysmodel.SqlField, IsForm bool, dbname string) (success bool) {
 	//
 	if tableName == "" || len(fields) == 0 {
 		// 表名为空或者没有字段
@@ -48,7 +52,7 @@ func createTable_mysql(userID string, tableName string, pkCol string, pkIsIdenti
 		listSql = append(listSql, idx_buffer.String())
 	}
 	// 执行批量sql
-	success, _ = dbhelper.ExecMoreSql(userID, true, listSql)
+	success, _ = dbhelper.ExecMoreSql(userID, true, listSql, dbname)
 	return success
 }
 
@@ -176,10 +180,22 @@ func concatMysqlFieldDefine(sqlCol sysmodel.SqlField) string {
 }
 
 //检查表是否存在
-func tableIsExists_mysql(userID string, tableName string) bool {
+func tableIsExists_mysql(userID string, tableName string, dbName string) bool {
+	var engine *xorm.Engine
+	if dbName == enum.ExSaleDb {
+		db, _ := conn.GetSaleExDb()
+		engine = db
+	} else if dbName == enum.ExSaleSumDb {
+		db, _ := conn.GetSaleSumDb()
+		engine = db
+	} else {
+		db, _ := conn.GetConnection(userID, false)
+		engine = db
+	}
+
 	// 查询表是否存在
-	db, _ := conn.GetConnection(userID, false)
-	tName, _ := db.QueryString("show tables like '" + tableName + "'")
+	/*tName, _ := dbhelper.QueryFirstCol(userID, false, "show tables like ? ", tableName)*/
+	tName, _ := engine.QueryString("show tables like '" + tableName + "'")
 	if len(tName) > 0 {
 		return true
 	}
@@ -210,7 +226,7 @@ func addField_mysql(userID string, tableName string, fields []sysmodel.SqlField)
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " add column ", concatMysqlFieldDefine(field))
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 	return false
 }
@@ -222,7 +238,7 @@ func dropField_mysql(userID string, tableName string, fields []sysmodel.SqlField
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " drop column ", field.ColName)
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 }
 
@@ -233,7 +249,7 @@ func alterField_mysql(userID string, tableName string, fields []sysmodel.SqlFiel
 	for index, field := range fields {
 		sqlList[index] = commutil.AppendStr("alter table ", tableName, " modify ", concatMysqlFieldDefine(field))
 	}
-	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList)
+	success, _ := dbhelper.ExecMoreSql(userID, true, sqlList, "")
 	return success
 	return false
 }
@@ -281,11 +297,26 @@ func getProcParList_mysql(userID string, procNmae string) []sysmodel.ProcPar {
 }
 
 //获取某张表的结构信息
-func getSqlTableStruct_mysql(userID string, sqlTableName string) (m sysmodel.SqlTableStruct) {
+func getSqlTableStruct_mysql(userID string, sqlTableName string, dbName string) (m sysmodel.SqlTableStruct) {
+	var engine *xorm.Engine
+	if commutil.IsNullOrEmpty(dbName) {
+		db, _ := conn.GetConnection(userID, false)
+		engine = db
+	} else if dbName == enum.ExSaleDb {
+		db, _ := conn.GetSaleExDb()
+		engine = db
+	} else if dbName == enum.ExSaleSumDb {
+		db, _ := conn.GetSaleSumDb()
+		engine = db
+	} else {
+		db, _ := conn.GetConnection(userID, false)
+		engine = db
+	}
 	//toto
-	values, _ := dbhelper.Query(userID, false,
-		"select * from information_schema.columns where table_schema=DATABASE() and table_name=? order by ordinal_position",
-		sqlTableName)
+	values, _ := engine.QueryInterface("select * from information_schema.columns where table_schema=DATABASE() and table_name=? order by ordinal_position", sqlTableName)
+	/*values, _ := dbhelper.Query(userID, false,
+	"select * from information_schema.columns where table_schema=DATABASE() and table_name=? order by ordinal_position",
+	sqlTableName)*/
 	m.TableName = sqlTableName
 	if values != nil && len(values) > 0 {
 		m.ColList = make([]sysmodel.SqlField, len(values))
@@ -293,7 +324,7 @@ func getSqlTableStruct_mysql(userID string, sqlTableName string) (m sysmodel.Sql
 		for index, col := range values {
 			sqlField = sysmodel.SqlField{}
 			if col["COLUMN_KEY"] == "PRI" { // 主键约束
-				m.PrimaryKey = col["COLUMN_NAME"]
+				m.PrimaryKey = commutil.ToString(col["COLUMN_NAME"])
 				sqlField.IsPrimaryKey = true
 			}
 			if col["CHARACTER_MAXIMUM_LENGTH"] == "" { // 字段长度
@@ -301,15 +332,20 @@ func getSqlTableStruct_mysql(userID string, sqlTableName string) (m sysmodel.Sql
 			} else {
 				sqlField.DataLength = commutil.ToInt(col["CHARACTER_MAXIMUM_LENGTH"])
 			}
-			sqlField.DataType = sysmodel.SqlDataType{DataType: col["DATA_TYPE"], Length: sqlField.DataLength}
-			sqlField.ColName = col["COLUMN_NAME"]
-			sqlField.DefaultValue = col["COLUMN_DEFAULT"] //默认值
+			sqlField.DataType = sysmodel.SqlDataType{DataType: commutil.ToString(col["DATA_TYPE"]), Length: sqlField.DataLength}
+			if col["NUMERIC_SCALE"] == "" { // 字段长度
+				sqlField.DataType.DecimalLength = 0
+			} else {
+				sqlField.DataType.DecimalLength = commutil.ToInt(col["NUMERIC_SCALE"])
+			}
+			sqlField.ColName = commutil.ToString(col["COLUMN_NAME"])
+			sqlField.DefaultValue = commutil.ToString(col["COLUMN_DEFAULT"]) //默认值
 			if col["IS_NULLABLE"] == "NO" {
 				sqlField.IsNotNull = true
 			} else {
 				sqlField.IsNotNull = false
 			}
-			sqlField.ColMemo = col["COLUMN_COMMENT"]
+			sqlField.ColMemo = commutil.ToString(col["COLUMN_COMMENT"])
 			m.ColList[index] = sqlField
 		}
 		return m

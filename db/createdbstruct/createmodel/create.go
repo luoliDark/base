@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gohouse/converter"
 	"github.com/luoliDark/base/db/conn"
+
+	"github.com/gohouse/converter"
 )
 
 // CreateStructBySql 根据SQL生成实体类
@@ -43,7 +44,7 @@ func CreateStructBySql(tame string) {
 		// 生成的结构体保存路径
 		//SavePath("/paas/base/db/createdbstruct/dbtomodel/modelp.go").
 		// 数据库dsn,这里可以使用 t2t.DB() 代替,参数为 *db.DB 对象
-		Dsn(conn.GetConnStr()).
+		Dsn(conn.GetConnStr("")).
 		// 执行
 		Run()
 	if err != nil {
@@ -88,7 +89,7 @@ func CreateStructBySql2(tame, createmodel, path string) {
 		// 生成的结构体保存路径
 		SavePath(path).
 		// 数据库dsn,这里可以使用 t2t.DB() 代替,参数为 *db.DB 对象
-		Dsn(conn.GetConnStr()).
+		Dsn(conn.GetConnStr("")).
 		// 执行
 		Run()
 	if err != nil {
