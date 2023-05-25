@@ -303,7 +303,7 @@ func GetDBConnection(userid string, ismasterdb bool, dbname string) (db *xorm.En
 		engine, _ := GetSaleSumDb()
 		db = engine
 	} else {
-		engine, _ := GetConnection(userid, true)
+		engine, _ := GetConnection(userid, ismasterdb)
 		db = engine
 	}
 	return db, nil

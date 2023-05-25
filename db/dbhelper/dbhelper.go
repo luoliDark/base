@@ -19,7 +19,6 @@ import (
 	"github.com/gogf/gf/util/gconv"
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/db/conn"
-	"github.com/luoliDark/base/db/enum"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/sysmodel/logtype"
@@ -229,16 +228,7 @@ func ExecMoreSql(userID string, IsMasterDB bool, sqlList []string, dbname string
 		return true, nil
 	}
 	var db *xorm.Engine
-	if commutil.IsNullOrEmpty(dbname) {
-		engine, _ := conn.GetConnection(userID, true)
-		db = engine
-	} else if dbname == enum.ExSaleDb {
-		engine, _ := conn.GetSaleExDb()
-		db = engine
-	} else if dbname == enum.ExSaleSumDb {
-		engine, _ := conn.GetSaleSumDb()
-		db = engine
-	}
+	db, _ = conn.GetDBConnection(userID, false, dbname)
 
 	// 开启事务
 	session := db.NewSession()

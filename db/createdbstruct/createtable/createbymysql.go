@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"strings"
 
-	"github.com/luoliDark/base/db/enum"
-
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/db/dbhelper"
 	"github.com/luoliDark/base/sysmodel"
@@ -182,17 +180,7 @@ func concatMysqlFieldDefine(sqlCol sysmodel.SqlField) string {
 //检查表是否存在
 func tableIsExists_mysql(userID string, tableName string, dbName string) bool {
 	var engine *xorm.Engine
-	if dbName == enum.ExSaleDb {
-		db, _ := conn.GetSaleExDb()
-		engine = db
-	} else if dbName == enum.ExSaleSumDb {
-		db, _ := conn.GetSaleSumDb()
-		engine = db
-	} else {
-		db, _ := conn.GetConnection(userID, false)
-		engine = db
-	}
-
+	engine, _ = conn.GetDBConnection(userID, false, dbName)
 	// 查询表是否存在
 	/*tName, _ := dbhelper.QueryFirstCol(userID, false, "show tables like ? ", tableName)*/
 	tName, _ := engine.QueryString("show tables like '" + tableName + "'")
@@ -299,19 +287,7 @@ func getProcParList_mysql(userID string, procNmae string) []sysmodel.ProcPar {
 //获取某张表的结构信息
 func getSqlTableStruct_mysql(userID string, sqlTableName string, dbName string) (m sysmodel.SqlTableStruct) {
 	var engine *xorm.Engine
-	if commutil.IsNullOrEmpty(dbName) {
-		db, _ := conn.GetConnection(userID, false)
-		engine = db
-	} else if dbName == enum.ExSaleDb {
-		db, _ := conn.GetSaleExDb()
-		engine = db
-	} else if dbName == enum.ExSaleSumDb {
-		db, _ := conn.GetSaleSumDb()
-		engine = db
-	} else {
-		db, _ := conn.GetConnection(userID, false)
-		engine = db
-	}
+	engine, _ = conn.GetDBConnection(userID, false, dbName)
 	//toto
 	values, _ := engine.QueryInterface("select * from information_schema.columns where table_schema=DATABASE() and table_name=? order by ordinal_position", sqlTableName)
 	/*values, _ := dbhelper.Query(userID, false,
