@@ -302,6 +302,9 @@ func GetDBConnection(userid string, ismasterdb bool, dbname string) (db *xorm.En
 	} else if dbname == enum.BusFaDb {
 		engine, _ := GetSaleSumDb()
 		db = engine
+	} else if dbname == enum.BusFaDb_Original {
+		engine, _ := GetDb(dbname)
+		db = engine
 	} else {
 		engine, _ := GetConnection(userid, ismasterdb)
 		db = engine
@@ -333,6 +336,21 @@ func GetBusFaDb() (db *xorm.Engine, err error) {
 		InitConnections()
 	}
 	db = EngineMap["busfadb"]
+	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
+	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
+
+	return db, err
+}
+
+// GetDBConnection 获取连接对象
+func GetBusFaDbOriginal() (db *xorm.Engine, err error) {
+
+	//初始化对象
+	if EngineMap == nil || EngineMap["busfa_original"] == nil {
+		// 连接串是空的  重新执行数据库连接获取
+		InitConnections()
+	}
+	db = EngineMap["busfa_original"]
 	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
 	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
 

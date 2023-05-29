@@ -8,6 +8,7 @@ const ExSaleDb = "saleexdb"
 
 //业财db
 const BusFaDb = "busfadb"
+const BusFaDb_Original = "busfadb_original"
 
 //模板表名称
 var Oldsumtablename = "MTTG_Sum"
