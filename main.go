@@ -1,9 +1,15 @@
 package main
 
 import (
-	"github.com/luoliDark/base/db/dbhelper"
+	"fmt"
+
+	"github.com/luoliDark/base/db/conn"
 )
 
 func main() {
-	dbhelper.Query("", true, "select * from eb_user limit 1")
+	db, _ := conn.GetBusFaDbOriginal()
+	sesion := db.NewSession()
+	res, _ := sesion.QueryString("select code from c_store limit  1")
+	sesion.Close()
+	fmt.Println(res)
 }

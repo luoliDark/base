@@ -61,6 +61,10 @@ func InitConnections() {
 
 	//初始化 商旅平台 数据库
 	initConn(DBType, "easytradb")
+
+	//初始化业财原始库
+	initConn(DBType, "busfa_original")
+	initConn(DBType, "busfa")
 }
 
 //初始化连接
