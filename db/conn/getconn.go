@@ -304,7 +304,7 @@ func GetDBConnection(userid string, ismasterdb bool, dbname string) (db *xorm.En
 		engine, _ := GetSaleSumDb()
 		db = engine
 	} else if dbname == enum.BusFaDb {
-		engine, _ := GetSaleSumDb()
+		engine, _ := GetBusFaDb()
 		db = engine
 	} else if dbname == enum.BusFaDb_Original {
 		engine, _ := GetBusFaDbOriginal()
