@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
-
-	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/db/dbhelper"
 )
 
 func main() {
-	fmt.Println(commutil.GetUUID())
+	dbhelper.Query("", true, "select * from eb_user limit 1")
 }

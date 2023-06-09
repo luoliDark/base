@@ -14,7 +14,6 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
-	"github.com/go-xorm/core"
 	"github.com/gogf/gf/frame/g"
 	"github.com/gogf/gf/util/gconv"
 	"github.com/luoliDark/base/confighelper"
@@ -26,6 +25,7 @@ import (
 	"github.com/luoliDark/base/util/jsonutil"
 	"github.com/xormplus/xorm"
 	xormplus_core "github.com/xormplus/xorm/core"
+	"xorm.io/core"
 )
 
 // 拼接sql 执行失败脚本
