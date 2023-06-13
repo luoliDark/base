@@ -3,13 +3,12 @@ package main
 import (
 	"fmt"
 
-	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/redishelper/rediscache"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 func main() {
-	db, _ := conn.GetBusFaDbOriginal()
-	sesion := db.NewSession()
-	res, _ := sesion.QueryString("select code from c_store limit  1")
-	sesion.Close()
-	fmt.Println(res)
+	sqltable := rediscache.GetHashMap("sys_fpage_" + commutil.ToString("30202"))
+
+	fmt.Println(sqltable)
 }

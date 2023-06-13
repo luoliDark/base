@@ -68,7 +68,7 @@ func LoadRedisCache(userid string) (err error) {
 		return err
 	}
 
-	session := conn.GetSession(true)
+	session, _ := conn.GetSession()
 	defer session.Close()
 	// 必要检查
 	err = CheckCacheSQL(session, userid, &v)

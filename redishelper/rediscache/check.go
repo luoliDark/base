@@ -65,7 +65,7 @@ func CheckCacheSQL(session *xorm.Session, userid string, v *Result) (err error) 
 	//遍历xml所有缓存配置SQL
 	// list也检查 避免语句中也有字段也错误！
 	if session == nil {
-		session = conn.GetSession(true)
+		session, _ = conn.GetSession()
 		defer session.Close()
 	}
 	bf := bytes.Buffer{}
