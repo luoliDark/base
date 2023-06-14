@@ -64,7 +64,7 @@ func InitConnections() {
 
 	//初始化业财原始库
 	initConn(DBType, "busfa_original")
-	initConn(DBType, "busfa")
+	initConn(DBType, "busfadb")
 }
 
 //初始化连接

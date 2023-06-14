@@ -3,12 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/luoliDark/base/redishelper/rediscache"
-	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/db/conn"
 )
 
 func main() {
-	sqltable := rediscache.GetHashMap("sys_fpage_" + commutil.ToString("30202"))
+	en, _ := conn.GetBusFaDb()
 
-	fmt.Println(sqltable)
+	fmt.Println(en)
 }
