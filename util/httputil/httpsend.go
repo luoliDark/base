@@ -152,3 +152,24 @@ func PostJson(url string, data interface{}) (string, error) {
 	result, _ := ioutil.ReadAll(resp.Body)
 	return string(result), nil
 }
+
+/**
+POST
+*/
+// 发送POST请求
+// url： 请求地址
+// data： POST请求提交的数据
+// contentType： 请求体格式，如：application/json
+// content： 请求放回的内容
+func PostJsonStr(url string, str string) (string, error) {
+	url = strings.TrimLeft(strings.TrimRight(url, " "), " ")
+	// 超时时间：5秒
+	resp, err := http.Post(url, "application/json", bytes.NewBufferString(str))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	result, _ := ioutil.ReadAll(resp.Body)
+	return string(result), nil
+}

@@ -367,7 +367,7 @@ func GetSubmmitUserByUserCol(pid int, primarykey string, col string) (sysmodel.S
 	if col == "" {
 		col = constant.CreateUidColName
 	}
-	session := conn.GetSession(true)
+	session, _ := conn.GetSession()
 	defer session.Close()
 	hashMap := rediscache.GetHashMap(commutil.AppendStr("sys_fpage_", pid))
 	sqltablename := hashMap["sqltablename"]

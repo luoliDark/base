@@ -27,7 +27,7 @@ func GetFormUrlByOnlyView(key string) string {
 
 func GetUserByOnlyView(loginUid string) (sysmodel.SSOUser, error) {
 
-	session := conn.GetSession(true)
+	session, _ := conn.GetSession()
 	defer session.Close()
 
 	ebuser := eb.Eb_user{}
