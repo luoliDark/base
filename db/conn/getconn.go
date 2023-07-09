@@ -360,3 +360,19 @@ func GetBusFaDbOriginal() (db *xorm.Engine, err error) {
 
 	return db, err
 }
+
+// 根据传入的DBCode获取数据库连接对象
+func GetDBByCode(dbCode string) (db *xorm.Engine, err error) {
+	if commutil.IsNullOrEmpty(dbCode) {
+		return GetDB()
+	}
+	if EngineMap == nil || EngineMap[dbCode] == nil {
+		DBType = confighelper.GetIniConfig(CONF_SEC_GLOBAL, CONF_CURRDB)
+		if DBType == "" {
+			DBType = DBTYPE_MYSQL
+		}
+		initConn(DBType, dbCode)
+	}
+	db = EngineMap[dbCode]
+	return db, err
+}
