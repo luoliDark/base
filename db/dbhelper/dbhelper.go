@@ -221,7 +221,7 @@ func ExecSqlByTran(session *xorm.Session, userID string, IsMasterDB bool, sqlOrA
 
 //执行多条SQL语句，
 func ExecMoreSql(userID string, IsMasterDB bool, sqlList []string, dbname string) (bool, error) {
-	tim := loghelper.BeginimeRecord() //记录开始时间
+	//tim := loghelper.BeginimeRecord() //记录开始时间
 	// 用事务执行多条SQL语句，，
 	if sqlList == nil || len(sqlList) == 0 {
 		// 没有可执行sql 直接返回 true
@@ -252,7 +252,7 @@ func ExecMoreSql(userID string, IsMasterDB bool, sqlList []string, dbname string
 		loghelper.ByError(logtype.ExecMoreSqlErr, sqlError, userID)
 		return false, err
 	}
-	loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlErr, tim, strings.Join(sqlList, ";")) //记录结束时间
+	//oghelper.EndTimeRecord(userID, logtype.ExecMoreSqlErr, tim, strings.Join(sqlList, ";")) //记录结束时间
 	return true, nil
 }
 
@@ -451,7 +451,7 @@ func ExecSqlByTransaction(userID string, connSession *xorm.Session, sqlOrArgs ..
 //执行多条SQL语句，
 func ExecMoreSqlByTransaction(userID string, connSession xorm.Session, sqlList []string) (bool, error) {
 
-	tim := loghelper.BeginimeRecord() //记录开始时间
+	//tim := loghelper.BeginimeRecord() //记录开始时间
 	if len(sqlList) == 0 {
 		return true, nil
 	}
@@ -464,7 +464,7 @@ func ExecMoreSqlByTransaction(userID string, connSession xorm.Session, sqlList [
 			return false, err
 		}
 	}
-	loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlBrTranErr, tim, strings.Join(sqlList, ";")) //记录结束时间
+	//loghelper.EndTimeRecord(userID, logtype.ExecMoreSqlBrTranErr, tim, strings.Join(sqlList[], ";")) //记录结束时间
 	return true, nil
 }
 
