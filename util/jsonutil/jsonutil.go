@@ -105,3 +105,21 @@ func JsonToMap(jsonstr string) (map[string]interface{}, error) {
 	}
 	return result, nil
 }
+
+func InterfaceToMap(datamap interface{}) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	bytes, err := json.Marshal(datamap)
+	if err != nil {
+		/// 转换失败
+		fmt.Errorf("struct数组 转json 失败," + err.Error())
+
+		return result, err
+	}
+	err = json.Unmarshal(bytes, &result)
+	if err != nil {
+		fmt.Errorf("json 转map 失败," + err.Error())
+
+		return nil, err
+	}
+	return result, nil
+}

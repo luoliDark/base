@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/luoliDark/base/confighelper"
+
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/util/commutil"
 	"github.com/tealeg/xlsx"
@@ -268,4 +270,12 @@ func DataToExcelEntity(dataEntity []map[string]string, isMain bool, langCode str
 	}
 
 	return listobj
+}
+
+func CreateExcelPath() (string, string) {
+	timeStr := time.Now().Format("20060102150405")
+	path := confighelper.LoadGoEnv()
+	path += "temp/excel/" + timeStr + ".xls"
+	webPath := "/base/static/temp/excel/" + timeStr + ".xls"
+	return path, webPath
 }
