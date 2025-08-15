@@ -7,7 +7,7 @@ import (
 )
 
 func main() {
-	en, _ := conn.GetBusFaDb()
+	en, _ := conn.GetDianShangDB()
 
 	fmt.Println(en)
 }

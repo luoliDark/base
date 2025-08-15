@@ -65,6 +65,9 @@ func InitConnections() {
 	//初始化业财原始库
 	initConn(DBType, "busfa_original")
 	initConn(DBType, "busfadb")
+
+	//初始化电商平台
+	initConn(DBType, "dianshang")
 }
 
 //初始化连接
@@ -355,6 +358,21 @@ func GetBusFaDbOriginal() (db *xorm.Engine, err error) {
 		InitConnections()
 	}
 	db = EngineMap["busfa_original"]
+	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
+	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
+
+	return db, err
+}
+
+// GetDBConnection 获取连接对象
+func GetDianShangDB() (db *xorm.Engine, err error) {
+
+	//初始化对象
+	if EngineMap == nil || EngineMap["dianshang"] == nil {
+		// 连接串是空的  重新执行数据库连接获取
+		InitConnections()
+	}
+	db = EngineMap["dianshang"]
 	//??? 缺少连接监控程序，防止开发人员连接获取出去以后不进行关闭，GC或mysql 也是长时间不地其关闭
 	//注：连接监控时需要获取当前调用本方法的上层go 代码方法，这样才能知道是什么代码没关闭连接
 
