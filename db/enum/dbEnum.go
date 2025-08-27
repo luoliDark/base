@@ -10,6 +10,9 @@ const ExSaleDb = "saleexdb"
 const BusFaDb = "busfadb"
 const BusFaDb_Original = "busfadb_original"
 
+//电商
+const DianShang = "dianshang"
+
 //模板表名称
 var Oldsumtablename = "MTTG_Sum"
 var Oldsumtradetablename = "MTDP_PaySum"

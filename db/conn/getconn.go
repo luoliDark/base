@@ -68,6 +68,7 @@ func InitConnections() {
 
 	//初始化电商平台
 	initConn(DBType, "dianshang")
+
 }
 
 //初始化连接
@@ -311,6 +312,9 @@ func GetDBConnection(userid string, ismasterdb bool, dbname string) (db *xorm.En
 		db = engine
 	} else if dbname == enum.BusFaDb_Original {
 		engine, _ := GetBusFaDbOriginal()
+		db = engine
+	} else if dbname == enum.DianShang {
+		engine, _ := GetDianShangDB()
 		db = engine
 	} else {
 		engine, _ := GetConnection(userid, ismasterdb)
