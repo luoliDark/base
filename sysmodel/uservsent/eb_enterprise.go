@@ -52,7 +52,7 @@ func UpdateMenuVer(entid string) error {
 // 检查该表是否存在平台数据+企业数据共用
 func IsSharedTable(tableName string) bool {
 
-	m := rediscache.GetHashMap("sys_pubsqltable_" + tableName)
+	m := rediscache.GetHashMap(0, 0, "sys_pubsqltable", tableName)
 	if len(m) > 0 {
 		tb := m["sqltable"]
 		if !g.IsEmpty(tb) {
