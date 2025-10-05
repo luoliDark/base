@@ -9,7 +9,9 @@ import (
 )
 
 // 获取listMap对象
-func GetListMap(key string) []map[string]string {
+func GetListMap(entId, Pid int, xmlName, keyValueStr string) []map[string]string {
+
+	key := xmlName + "_" + keyValueStr
 
 	key = strings.ToLower(key)
 
@@ -31,7 +33,9 @@ func GetListMap(key string) []map[string]string {
 }
 
 // 获取HashMap对象
-func GetHashMap(key string) map[string]string {
+func GetHashMap(entId, Pid int, xmlName, keyValueStr string) map[string]string {
+
+	key := xmlName + "_" + keyValueStr
 
 	key = strings.ToLower(key)
 
@@ -99,7 +103,7 @@ func GetLanguageText(sourceObjID string, languageCode string, sourceDetailID str
 		languageCode = "zh"
 	}
 
-	redismap := GetHashMap("sys_langdetail_" + strings.ToLower(sourceObjID) + "_" + strings.ToLower(languageCode) + "_" + strings.ToLower(sourceDetailID))
+	redismap := GetHashMap(0, 0, "sys_langdetail", strings.ToLower(sourceObjID)+"_"+strings.ToLower(languageCode)+"_"+strings.ToLower(sourceDetailID))
 
 	if redismap == nil || len(redismap) <= 0 {
 		return result
