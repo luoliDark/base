@@ -65,7 +65,7 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 
 	if err != nil {
 		//查询菜单版本
-		globalm := rediscache.GetHashMap("sys_global_1")
+		globalm := rediscache.GetHashMap(0, 0, "sys_global", "1")
 		ent := make([]ssomodel.EB_EntVsUser, 1)
 		ent[0] = ssomodel.EB_EntVsUser{EntID: "0", EntName: "未知企业", Mver: globalm["menuver"], FormEntId: "0"}
 		user.EnList = ent
@@ -87,7 +87,7 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 			user.IsOpenDingPhone = commutil.ToInt(m["isopendingphone"]) //钉钉电话通知
 
 		}
-		entM := rediscache.GetHashMap("eb_enterprise_" + user.EntID)
+		entM := rediscache.GetHashMap(0, 0, "eb_enterprise", user.EntID)
 		if len(entM) == 0 {
 			return IsGetCompByUser, fmt.Errorf("当前登录企业未启用，请联系管理员！")
 		}

@@ -129,7 +129,7 @@ func BindSSOUser(ebuser *eb.Eb_user, ssouser *sysmodel.SSOUser, isMobile int8) (
 	}
 
 	//查询部门名称及相关部门领导
-	rowDepMap := rediscache.GetListMap("eb_deptusercol_20102")
+	rowDepMap := rediscache.GetListMap(ebuser.EntId, 0, "eb_deptusercol", "20102")
 	var sbdepuser bytes.Buffer
 	for ind, _ := range rowDepMap {
 		m := rowDepMap[ind]
@@ -279,7 +279,7 @@ func BindSSOUser(ebuser *eb.Eb_user, ssouser *sysmodel.SSOUser, isMobile int8) (
 		m := deptM[0]
 		colArr := strings.Split(deptExCol, ",")
 		for _, c := range colArr {
-			newVal, err := getExDataSourceColNameValue("dept", c, m[c])
+			newVal, err := getExDataSourceColNameValue(ssouser.EntID, "dept", c, m[c])
 			if err != nil {
 				return ssouser, errors.New("获取登录用户扩展字段失败" + err.Error())
 			}
@@ -292,7 +292,7 @@ func BindSSOUser(ebuser *eb.Eb_user, ssouser *sysmodel.SSOUser, isMobile int8) (
 		m := compM[0]
 		colArr := strings.Split(compExCol, ",")
 		for _, c := range colArr {
-			newVal, err := getExDataSourceColNameValue("comp", c, m[c])
+			newVal, err := getExDataSourceColNameValue(ssouser.EntID, "comp", c, m[c])
 			if err != nil {
 				return ssouser, errors.New("获取登录用户扩展字段失败" + err.Error())
 			}
@@ -305,7 +305,7 @@ func BindSSOUser(ebuser *eb.Eb_user, ssouser *sysmodel.SSOUser, isMobile int8) (
 		m := userM[0]
 		colArr := strings.Split(selfExCol, ",")
 		for _, c := range colArr {
-			newVal, err := getExDataSourceColNameValue("self", c, m[c])
+			newVal, err := getExDataSourceColNameValue(ssouser.EntID, "self", c, m[c])
 			if err != nil {
 				return ssouser, errors.New("获取登录用户扩展字段失败" + err.Error())
 			}
@@ -322,17 +322,17 @@ func BindSSOUser(ebuser *eb.Eb_user, ssouser *sysmodel.SSOUser, isMobile int8) (
 	return ssouser, nil
 }
 
-func getExDataSourceColNameValue(ctype, col, colvalue string) (string, error) {
+func getExDataSourceColNameValue(entid, ctype, col, colvalue string) (string, error) {
 	//默认值关健字 例：user.deptid.depttype  /  user.compid.rate /  user.self.sex
 	colMap := make(map[string]string)
 	switch ctype {
 	case "dept":
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20102" + col)
+		colMap = rediscache.GetHashMap(commutil.ToInt(entid), 0, "sys_fpagefieldlogin", "20102"+col)
 	case "comp":
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20103" + col)
+		colMap = rediscache.GetHashMap(commutil.ToInt(entid), 0, "sys_fpagefieldlogin", "20103"+col)
 	case "self":
 		//表示查询用户自己其它自定义字段
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20101" + strings.ToLower(col))
+		colMap = rediscache.GetHashMap(commutil.ToInt(entid), 0, "sys_fpagefieldlogin", "20101"+strings.ToLower(col))
 	default:
 		return "", errors.New("获取登录用户扩展字段失败请检查配置信息 " + ctype)
 	}
@@ -343,7 +343,7 @@ func getExDataSourceColNameValue(ctype, col, colvalue string) (string, error) {
 	if len(colMap) > 0 {
 		ds := strings.Trim(colMap["datasource"], " ")
 		if !g.IsEmpty(ds) {
-			dsM := rediscache.GetHashMap("sys_fpage_" + ds)
+			dsM := rediscache.GetHashMap(commutil.ToInt(entid), commutil.ToInt(ds), "sys_fpage", ds)
 			if len(dsM) > 0 {
 				dsSqlTab := dsM["sqltablename"]
 				pkcol := dsM["primarykey"]
@@ -359,17 +359,17 @@ func getExDataSourceColNameValue(ctype, col, colvalue string) (string, error) {
 	return colvalue, nil
 }
 
-func GetSubmmitUserByCreate_uid(pid int, primarykey string) (sysmodel.SSOUser, error) {
-	return GetSubmmitUserByUserCol(pid, primarykey, constant.CreateUidColName)
+func GetSubmmitUserByCreate_uid(entid, pid int, primarykey string) (sysmodel.SSOUser, error) {
+	return GetSubmmitUserByUserCol(entid, pid, primarykey, constant.CreateUidColName)
 }
 
-func GetSubmmitUserByUserCol(pid int, primarykey string, col string) (sysmodel.SSOUser, error) {
+func GetSubmmitUserByUserCol(entid, pid int, primarykey string, col string) (sysmodel.SSOUser, error) {
 	if col == "" {
 		col = constant.CreateUidColName
 	}
 	session, _ := conn.GetSession()
 	defer session.Close()
-	hashMap := rediscache.GetHashMap(commutil.AppendStr("sys_fpage_", pid))
+	hashMap := rediscache.GetHashMap(entid, pid, "sys_fpage", commutil.ToString(pid))
 	sqltablename := hashMap["sqltablename"]
 	create_uid, err := dbhelper.QueryFirstColByTran(session, "", true,
 		fmt.Sprintf("select %v from %v where billid = ?", col, sqltablename), primarykey)
@@ -438,7 +438,7 @@ func CheckUpdatePassword(user sysmodel.SSOUser) sysmodel.ResultBean {
 }
 
 //据默认值 取登录人扩展字段信息 例：所在部门 的部门某属性 或所在公司的某属性 （获取后将该字段保存到redis 下个用户登录是直接取值)
-func GetUserExAttrCol(defkeyword string, user *sysmodel.SSOUser) sysmodel.ResultBean {
+func GetUserExAttrCol(entid, defkeyword string, user *sysmodel.SSOUser) sysmodel.ResultBean {
 	//默认值关健字 例：user.deptid.depttype  /  user.compid.rate /  user.self.sex
 	defArr := strings.Split(defkeyword, ".")
 	if len(defArr) != 3 {
@@ -456,18 +456,18 @@ func GetUserExAttrCol(defkeyword string, user *sysmodel.SSOUser) sysmodel.Result
 		tableName = "eb_dept"
 		pkCol = "deptid"
 		pkVal = user.DeptID
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20102" + col)
+		colMap = rediscache.GetHashMap(commutil.ToInt(user.EntID), 0, "sys_fpagefieldlogin", "20102"+col)
 	case "comp":
 		tableName = "eb_company"
 		pkCol = "compid"
 		pkVal = user.CompID
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20103" + col)
+		colMap = rediscache.GetHashMap(commutil.ToInt(user.EntID), 0, "sys_fpagefieldlogin", "20103"+col)
 	case "self":
 		//表示查询用户自己其它自定义字段
 		tableName = "eb_user"
 		pkCol = "userid"
 		pkVal = user.UserID
-		colMap = rediscache.GetHashMap("sys_fpagefieldlogin_20101" + strings.ToLower(col))
+		colMap = rediscache.GetHashMap(commutil.ToInt(user.EntID), 0, "sys_fpagefieldlogin", "20101"+strings.ToLower(col))
 	}
 	if g.IsEmpty(tableName) {
 		return sysmodel.ResultBean{IsSuccess: false, ErrorMsg: "获取登录用户扩展字段失败请检查配置信息" + defkeyword}
@@ -482,7 +482,7 @@ func GetUserExAttrCol(defkeyword string, user *sysmodel.SSOUser) sysmodel.Result
 	if len(colMap) > 0 {
 		ds := strings.Trim(colMap["datasource"], " ")
 		if !g.IsEmpty(ds) {
-			dsM := rediscache.GetHashMap("sys_fpage_" + ds)
+			dsM := rediscache.GetHashMap(commutil.ToInt(entid), commutil.ToInt(ds), "sys_fpage", ds)
 			if len(dsM) > 0 {
 				dsSqlTab := dsM["sqltablename"]
 				pkcol := dsM["primarykey"]
@@ -641,7 +641,7 @@ func ChkExAppid(ctx *gin.Context) (err error, appid, secret, entid string) {
 
 	if !commutil.IsNullOrEmpty(appid) && !commutil.IsNullOrEmpty(secret) {
 
-		appinfo := rediscache.GetHashMap("sys_appinfo_" + appid)
+		appinfo := rediscache.GetHashMap(0, 0, "sys_appinfo", appid)
 
 		if appid == appinfo["appid"] && secret == appinfo["secret"] {
 			return nil, appid, secret, appinfo["entid"]
@@ -659,7 +659,7 @@ func ChkAppIdFromRedis(appid, secret string) (err error, entid string) {
 
 	if !commutil.IsNullOrEmpty(appid) && !commutil.IsNullOrEmpty(secret) {
 
-		appinfo := rediscache.GetHashMap("sys_appinfo_" + appid)
+		appinfo := rediscache.GetHashMap(0, 0, "sys_appinfo", appid)
 
 		if appid == appinfo["appid"] && secret == appinfo["secret"] {
 			return nil, appinfo["entid"]
