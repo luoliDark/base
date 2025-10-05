@@ -17,15 +17,18 @@ import (
 )
 
 //发送消息入口方法
-func SendMain(msg sysmodel.MsgEntity, user *sysmodel.SSOUser) sysmodel.ResultBean {
-
+func SendMain(msg sysmodel.MsgEntity, user *sysmodel.SSOUser, isInsertDBed bool) sysmodel.ResultBean {
+	if msg.EntId == 0 {
+		msg.EntId = commutil.ToInt(user.EntID)
+	}
+	msg.UserName = user.UserName
 	//插入DB
-	if msg.MsgType == "cc" || msg.MsgType == "push" || msg.MsgType == "info" {
+	if !isInsertDBed && (msg.MsgType == "cc" || msg.MsgType == "push" || msg.MsgType == "info") {
 		_ = InsertMsgToDB(msg, user)
 	}
 
 	//获取该entid对应的msgserver
-	entM := rediscache.GetHashMap("eb_enterprise_" + commutil.ToString(msg.EntId))
+	entM := rediscache.GetHashMap(commutil.ToInt(msg.EntId), 0, "eb_enterprise", commutil.ToString(msg.EntId))
 	msgUrl := entM["msgserverip"]
 	if g.IsEmpty(msgUrl) {
 		loghelper.ByError("发送消息失败", "没有维护msgUrl字段到eb_enterprise, msg=", user.UserID)
@@ -62,6 +65,7 @@ func InsertMsgToDB(entity sysmodel.MsgEntity, user *sysmodel.SSOUser) error {
 	bbsmsgbypid.MsgId = commutil.GetUUID()
 	bbsmsgbypid.MsgType = entity.MsgType
 	bbsmsgbypid.BillNo = entity.BillNo
+	bbsmsgbypid.TotalMoney = entity.TotalMoney
 	bbsmsgbypid.BillId = entity.PrimaryKey
 	bbsmsgbypid.Title = entity.Title
 	bbsmsgbypid.Body = entity.Body
@@ -76,24 +80,14 @@ func InsertMsgToDB(entity sysmodel.MsgEntity, user *sysmodel.SSOUser) error {
 	bbsmsgbypid.SendDate = commutil.GetNowTime()
 	bbsmsgbypid.SendUid = user.UserID
 
-	if bbsmsgbypid.BillVer == 0 {
-		m := rediscache.GetHashMap("sys_fpagever_" + commutil.ToString(bbsmsgbypid.FormEntId) + "_" + commutil.ToString(bbsmsgbypid.Pid))
-		if len(m) > 0 {
-			bbsmsgbypid.BillVer = commutil.ToInt(m["verid"])
-			bbsmsgbypid.PName = m["pname"]
-		} else {
-			panic("redis未找到该单据信息")
-		}
-	}
-
 	var formUid string
 	//if g.IsEmpty(bbsmsgbypid.BillNo) {
-	m := rediscache.GetHashMap("sys_fpage_" + commutil.ToString(bbsmsgbypid.Pid))
+	m := rediscache.GetHashMap(commutil.ToInt(user.EntID), bbsmsgbypid.Pid, "sys_fpage", commutil.ToString(bbsmsgbypid.Pid))
 	if len(m) > 0 {
 
 		tb := m["sqltablename"]
 
-		sql := "select billno,totalmoney,userid,deptid,detailcostallname from " + tb + " where billid=?"
+		sql := "select billno,totalmoney,userid,deptid,detailcostallname,memo from " + tb + " where billid=?"
 
 		re, _ := dbhelper.Query("", true, sql, bbsmsgbypid.BillId)
 		if len(re) > 0 {
@@ -158,38 +152,4 @@ func InsertMsgToDB(entity sysmodel.MsgEntity, user *sysmodel.SSOUser) error {
 	}
 
 	return nil
-}
-
-var h5url = ""
-
-func init() {
-	initH5Url()
-}
-
-func initH5Url() {
-	if g.IsEmpty(h5url) {
-		m := rediscache.GetHashMap("sys_global_1")
-		if len(m) > 0 {
-			h5url = m["h5url"]
-			fmt.Println("h5url", h5url)
-		}
-	}
-}
-
-func GetMobileMsgUrl(pid, ver int, pname, primarykey string) string {
-	var url string
-	if h5url == "" {
-		initH5Url()
-	}
-	url = h5url + "?pid=" + commutil.ToString(pid) + "&verid=0" + "&isreadonly=1&primarykey=" + primarykey + "&pk=" + primarykey + "&title=" + pname
-
-	return url
-}
-
-//Form/editform/50201/548/copy_50201D5OE1BML22BDI591
-func GetPCMsgUrl(pid, ver int, pname, primarykey string) string {
-	var url string
-	url = fmt.Sprintf(`Form/editform/%v/%v/%v?pname=%v`,
-		pid, ver, primarykey, pname)
-	return url
 }
