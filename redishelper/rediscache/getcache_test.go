@@ -6,10 +6,13 @@ import (
 )
 
 func TestGetList(t *testing.T) {
-	fmt.Println(GetListMap("sys_wfsteprelation_targetstepid_innerjoin_sys_wfstep_50201_start-f7f7cce2493a4be8b964a99235cbb474"))
 
 }
 
 func TestGetHashMap(t *testing.T) {
-	fmt.Println(GetHashMap("sys_fpagefield_4996"))
+
+	//re := GetHashMap(1, 50201, "sys_fpage", "50201")
+	//fmt.Println(re)
+	re := GetHashMap(1, 50201, "sys_wfflow", "50201_1")
+	fmt.Println(re)
 }

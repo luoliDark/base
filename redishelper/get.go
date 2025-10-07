@@ -9,7 +9,7 @@ import (
 )
 
 // 检查是否存在某key
-func IsExists(enterpriseID string, dbIndex int, key string) bool {
+func IsExists(preKeyStr string, dbIndex int, key string) bool {
 
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
@@ -22,8 +22,8 @@ func IsExists(enterpriseID string, dbIndex int, key string) bool {
 	defer c.Close()
 
 	//拼接企业ID
-	if enterpriseID != "" {
-		key = commutil.AppendStr(enterpriseID, "_", key)
+	if preKeyStr != "" {
+		key = commutil.AppendStr(preKeyStr, "_", key)
 	}
 
 	//判断key是否存在
@@ -35,7 +35,35 @@ func IsExists(enterpriseID string, dbIndex int, key string) bool {
 }
 
 // 获取SET 类型的字符串
-func GetString(enterpriseID string, dbIndex int, key string) string {
+func GetStringNew(key string, dbIndex int) string {
+
+	if g.IsEmpty(key) {
+		return ""
+	}
+
+	if mapPool[dbIndex] == nil {
+		Init(dbIndex)
+	}
+
+	//获取连接
+	c := GetConn(dbIndex)
+
+	//记得销毁本次链连接
+	defer c.Close()
+
+	//从redis获取
+	var re string
+	val, err := redis.String(c.Do("GET", key))
+	if err != nil {
+		re = ""
+	} else {
+		re = val
+	}
+	return re
+}
+
+// 获取SET 类型的字符串
+func GetString(preKeyStr string, dbIndex int, key string) string {
 
 	if g.IsEmpty(key) {
 		return ""
@@ -52,8 +80,8 @@ func GetString(enterpriseID string, dbIndex int, key string) string {
 	defer c.Close()
 
 	//拼接企业ID
-	if enterpriseID != "" {
-		key = commutil.AppendStr(enterpriseID, "_", key)
+	if preKeyStr != "" {
+		key = commutil.AppendStr(preKeyStr, "_", key)
 	}
 
 	//从redis获取
@@ -68,7 +96,7 @@ func GetString(enterpriseID string, dbIndex int, key string) string {
 }
 
 // 获取HashMap 类型的字符串
-func GetHashMap(enterpriseID string, dbIndex int, key string) map[string]string {
+func GetHashMap(preKeyStr string, dbIndex int, key string) map[string]string {
 
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
@@ -81,8 +109,8 @@ func GetHashMap(enterpriseID string, dbIndex int, key string) map[string]string 
 	defer c.Close()
 
 	//拼接企业ID
-	if enterpriseID != "" {
-		key = commutil.AppendStr(enterpriseID, "_", key)
+	if preKeyStr != "" {
+		key = commutil.AppendStr(preKeyStr, "_", key)
 	}
 
 	//从redis获取
@@ -95,7 +123,7 @@ func GetHashMap(enterpriseID string, dbIndex int, key string) map[string]string 
 }
 
 // 获取ListMap 类型的字符串
-func GetListMap(enterpriseID string, dbIndex int, key string) []map[string]string {
+func GetListMap(preKeyStr string, dbIndex int, key string) []map[string]string {
 
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
@@ -108,8 +136,8 @@ func GetListMap(enterpriseID string, dbIndex int, key string) []map[string]strin
 	defer c.Close()
 
 	//拼接企业ID
-	if enterpriseID != "" {
-		key = commutil.AppendStr(enterpriseID, "_", key)
+	if preKeyStr != "" {
+		key = commutil.AppendStr(preKeyStr, "_", key)
 	}
 
 	var lstMap []map[string]string
@@ -137,7 +165,7 @@ func GetListMap(enterpriseID string, dbIndex int, key string) []map[string]strin
 }
 
 // 获取ListMap 类型的字符串
-func GetList(enterpriseID string, dbIndex int, key string) []string {
+func GetList(preKeyStr string, dbIndex int, key string) []string {
 
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
@@ -150,8 +178,8 @@ func GetList(enterpriseID string, dbIndex int, key string) []string {
 	defer c.Close()
 
 	//拼接企业ID
-	if enterpriseID != "" {
-		key = commutil.AppendStr(enterpriseID, "_", key)
+	if preKeyStr != "" {
+		key = commutil.AppendStr(preKeyStr, "_", key)
 	}
 
 	var lst []string

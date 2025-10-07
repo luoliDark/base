@@ -9,7 +9,7 @@ import (
 	"github.com/luoliDark/base/util/commutil"
 )
 
-//SetHashMap set map对象到redis中 针对interface对象
+// SetHashMap set map对象到redis中 针对interface对象
 func SetHash(enterpriseID string, dbIndex int, key string, m map[string]interface{}) bool {
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
@@ -136,6 +136,29 @@ func SetStringExpire(enterpriseID string, dbIndex int, key string, val string, t
 }
 
 // 加载String对象到redis中
+func SetStringNew(dbIndex int, key string, value string) bool {
+
+	if mapPool[dbIndex] == nil {
+		Init(dbIndex)
+	}
+
+	//获取连接
+	c := GetConn(dbIndex)
+
+	//记得销毁本次链连接
+	defer c.Close()
+
+	_, err := c.Do("SET", key, value)
+	if err != nil {
+		loghelper.ByHighError(logtype.RedisLoadErr, "设置String失败"+err.Error(), "")
+		return false
+	}
+
+	return true
+
+}
+
+// 加载String对象到redis中
 func SetString(enterpriseID string, dbIndex int, key string, str string) bool {
 
 	if mapPool[dbIndex] == nil {
@@ -163,7 +186,7 @@ func SetString(enterpriseID string, dbIndex int, key string, str string) bool {
 
 }
 
-//模糊查找删除
+// 模糊查找删除
 // DelKeyPreStr 表示删除以某字符串开头的全部数据，包含list,map,string
 func DeleleByLike(dbIndex int, DelKeyPreStr string) bool {
 
@@ -192,11 +215,15 @@ func DeleleByLike(dbIndex int, DelKeyPreStr string) bool {
 }
 
 // 删除redis 数据by key
-func DeleteKey(dbIndex int, delKey string) bool {
+func DeleteKey(enterpriseID string, dbIndex int, delKey string) bool {
 	if mapPool[dbIndex] == nil {
 		Init(dbIndex)
 	}
 
+	//拼接企业ID
+	if enterpriseID != "" {
+		delKey = commutil.AppendStr(enterpriseID, "_", delKey)
+	}
 	//获取连接
 	c := GetConn(dbIndex)
 

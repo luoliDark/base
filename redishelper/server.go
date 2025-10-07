@@ -2,12 +2,15 @@ package redishelper
 
 import (
 	"fmt"
+	"sync"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/loghelper"
+
+	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/util/commutil"
+
+	"github.com/garyburd/redigo/redis"
 )
 
 //全局变量，用来保存16个库的连接对象
@@ -15,6 +18,7 @@ var mapPool map[int]*redis.Pool
 var redis_host string
 var redis_port int
 var password string
+var cacheInitLock sync.Mutex
 
 //获取服务器配置信息
 func GetServerInfo() (string, int, string) {
@@ -61,7 +65,12 @@ func Init(dbindex int) {
 	}
 
 	//待优化 网上推荐用 gopkg.in/redis.v5
-
+	cacheInitLock.Lock()
+	defer cacheInitLock.Unlock()
+	//再检查一遍，防止同时多次请求初始化
+	if mapPool[dbindex] != nil {
+		return
+	}
 	//创建连接对象
 	pool := &redis.Pool{
 

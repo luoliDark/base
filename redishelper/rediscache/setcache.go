@@ -15,7 +15,7 @@ func SetString(key, val string) bool {
 }
 
 // SetStringExpire 设置String对象
-// timeout ：time.Second 秒
+// timeout  秒
 func SetStringExpire(key, val string, timeout int) (b bool) {
 	key = strings.ToLower(key)
 

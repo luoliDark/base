@@ -6,23 +6,28 @@ package rediscache
 
 import (
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
+	"sync"
 	"time"
+
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/sysmodel/logtype"
 
 	redigo "github.com/garyburd/redigo/redis"
 	"github.com/gogf/gf/frame/g"
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/db/dbhelper"
-	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/redishelper"
-	"github.com/luoliDark/base/sysmodel/logtype"
 	"github.com/luoliDark/base/util/commutil"
 	"github.com/xormplus/xorm"
 )
+
+const nextUseCacheVerKey = "next_use_cache_ver"
 
 type StrCache struct {
 	DBname         string `xml:"DBname,attr"`
@@ -34,6 +39,7 @@ type StrCache struct {
 	HashKeyPreName string `xml:"HashKeyPreName,attr"`
 	Memo           string `xml:"Memo,attr"`
 	QuerySql       string `xml:"QuerySql"`
+	IsOther        string `xml:"IsOther,attr"`
 }
 
 type Result struct {
@@ -41,12 +47,28 @@ type Result struct {
 	Cache   []StrCache
 }
 
+var lockCacheRefer sync.Map
+
 // 加载xml中SQL语句查询数据到redis缓存
 func LoadRedisCache(userid string) (err error) {
-	if isok, err := updateFlagHandle(1); !isok {
-		return err
+
+	//调用新版本 刷缓存逻辑
+	openNewCache := commutil.ToInt(confighelper.GetIniConfig("global", "opennewcache"))
+	if commutil.ToBool(openNewCache) {
+		return LoadRedisMain("", "0", "0", "other")
 	}
-	defer UpdateFlagTheRuning()
+
+	a, ok := lockCacheRefer.Load("loadrediscache")
+	loadC := commutil.ToString(a)
+	fmt.Println("loadC=", loadC)
+	if ok && loadC != "" {
+		return errors.New("缓存刷新中. " + loadC)
+	}
+	lockCacheRefer.Store("loadrediscache", commutil.GetNowTime())
+	defer func() {
+		lockCacheRefer.Store("loadrediscache", "")
+	}()
+
 	//加载 xml文件
 	file, err := os.Open(confighelper.LoadGoEnv() + "cache.xml") //jsz 临时代码因为一直报文件找不到
 	if err != nil {
@@ -71,21 +93,32 @@ func LoadRedisCache(userid string) (err error) {
 	session, _ := conn.GetSession()
 	defer session.Close()
 	// 必要检查
-	err = CheckCacheSQL(session, userid, &v)
+	err = CheckCacheSQL(session, userid, v.Cache)
 	if err != nil {
 		loghelper.ByHighError(logtype.RedisCheckErr, err.Error(), userid)
 		return err
 	}
-
-	loghelper.ByInfo(logtype.Config, "开始初始化缓存", userid)
+	reqID := commutil.GetUUID()
 	//企业ID
 	enterpriseID := confighelper.GetEnterpriseID()
 	//获取企业id 及 缓存dbindex 及版本号
+	//缓存版本号1，因意外导致只刷新部分缓存未刷新完，版本号2未更新完成。下次刷新还会获取到刷新异常的版本号2，导致同一个key会有重复两份或多份数据。
+	//解决方式：记录每次开始刷新的版本号，版本号开始刷新，不管是否刷新完成，下次刷新不能再使用需要获取新版本号
 	dbIndex, cacheVer := GetCacheVerID(enterpriseID)
+	oldCacheVer := cacheVer
+	nextUseCacheVer := redishelper.GetString(enterpriseID, dbIndex, nextUseCacheVerKey)
 	if cacheVer > 0 {
 		cacheVer = cacheVer + 1 //版本号加1
-		enterpriseID = commutil.AppendStr(enterpriseID, "_v", commutil.ToString(cacheVer))
 	}
+	if commutil.ToInt(nextUseCacheVer) >= cacheVer {
+		cacheVer = commutil.ToInt(nextUseCacheVer) + 1 //检查版本号是否已经使用，已使用则在上次已使用版本号基础上再加1
+	}
+	//设置已使用的最新版本号
+	redishelper.SetString(enterpriseID, dbIndex, nextUseCacheVerKey, commutil.ToString(cacheVer))
+
+	loghelper.ByInfo(logtype.Config, fmt.Sprintf("开始初始化缓存，旧版本号：%v,下次刷新版本号：%v,实际下次版本号：%v,",
+		oldCacheVer, nextUseCacheVer, cacheVer)+reqID, userid)
+	enterpriseID = commutil.AppendStr(enterpriseID, "_v", commutil.ToString(cacheVer))
 	//redis 连接对象
 	c := redishelper.GetConn(dbIndex)
 
@@ -126,7 +159,7 @@ func LoadRedisCache(userid string) (err error) {
 
 	//保存最新版本号，及本次刷新时间
 	setCacheVer(enid, cacheVer) //使版本号自动加1
-	loghelper.ByInfo(logtype.Config, "结束初始化缓存", userid)
+	loghelper.ByInfo(logtype.Config, "结束初始化缓存 "+reqID, userid)
 
 	return nil
 }

@@ -2,9 +2,8 @@ package redishelper
 
 import (
 	"fmt"
+	"paas/base/confighelper"
 	"testing"
-
-	"github.com/luoliDark/base/confighelper"
 )
 
 func TestGetList(t *testing.T) {
