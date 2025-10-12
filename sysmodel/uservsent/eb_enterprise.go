@@ -32,6 +32,8 @@ type Eb_enterprise struct {
 	IsOpenWaitTaskSend int    `xorm:"isopenwaittasksend" json:"isopenwaittasksend"`
 	WaitTaskTmplateId  string `xorm:"waittasktmplateid" json:"waittasktmplateid"`
 	IsWFFindNextByUser int    `xorm:"iswffindnextbyuser" json:"iswffindnextbyuser"` //查询上级领导按人员档案的所属上级查找
+	//层级审批时是否用表头部门deptid做为开始查找 否则则用制单人用户本身的部门开始查找
+	IsWFFindNextByFormDept int `xorm:"iswffindnextbyformdept" json:"iswffindnextbyformdept"`
 }
 
 func (*Eb_enterprise) TableName() string {
