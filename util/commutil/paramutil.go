@@ -54,7 +54,7 @@ func ReplaceSpecialCharTheEmpty(val string) string {
 	return ReplaceSpecialChar(val, "")
 }
 
-//是否有特殊 字符, 汉字等
+//是否有特殊 字符
 func HasSpecialCharacterByStr(val string) bool {
 	for _, v := range val {
 		if HasSpecialCharacter(v) {
@@ -69,7 +69,6 @@ func HasSpecialCharacterByStr(val string) bool {
 判断是否为十进制数字： unicode.IsDigit(v)
 判断是否为数字： unicode.IsNumber(v)
 判断是否为空白符号： unicode.IsSpace(v)
-
 判断是否为Unicode标点字符 :unicode.IsPunct(v)
 判断是否为中文：unicode.Han(v)
 */
@@ -100,4 +99,21 @@ func WebParamsIsNull(s string) bool {
 		return true
 	}
 	return false
+}
+
+//替换特殊字符
+func ReplaceSpchar(val string) string {
+
+	if strings.Contains(val, "\t") {
+		val = strings.ReplaceAll(val, "\t", " ")
+	}
+
+	if strings.Contains(val, "\n") {
+		val = strings.ReplaceAll(val, "\n", "\\n")
+	}
+
+	if strings.Contains(val, "\r") {
+		val = strings.ReplaceAll(val, "\r", "\\r")
+	}
+	return val
 }

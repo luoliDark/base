@@ -3,23 +3,19 @@ package commutil
 import (
 	"fmt"
 	"testing"
+
+	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/jsonutil"
 )
 
 func TestToFloat32(t *testing.T) {
-	var a float64
-	a = 33.44
 
-	var b float32
-	b = 33.4
+	startdate := TimParse("2024-12-24", commutil.Time_Fomat03)
+	enddate := TimParse("2025-01-22", commutil.Time_Fomat03)
 
-	var c string
-	c = "22.33434343434232323323"
+	diffMonth := GetSubMonth(startdate, enddate)
+	fmt.Println(diffMonth)
 
-	b = ToFloat32(a)
-	fmt.Println(b)
-	b = ToFloat32(c)
-
-	fmt.Println(b)
 }
 
 func TestAppendStr(t *testing.T) {
@@ -31,38 +27,16 @@ func TestToBool(t *testing.T) {
 	fmt.Println(ToBool("true"), ToBool(1), ToBool(nil))
 }
 
-func TestGetNowTime(t *testing.T) {
-	fmt.Println(GetNowTime())
+func TestGetNowMonth(t *testing.T) {
+	fmt.Println(GetNowMonth())
 }
 
-func TestToString(t *testing.T) {
-	fmt.Println(ToString("1231.12"))
-
-	var a float64 = 1231.12
-	fmt.Println(ToString(a))
-}
-
-func TestGetHttpCatchErrMsg(t *testing.T) {
-	//GetHttpCatchErrMsg(fmt.Errorf("123"),"")
-	defer CatchError()
-	//panic(123)
-	panic("123")
-}
-
-func TestToBool1(t *testing.T) {
-	var a int64 = 1
-	var b int = 1
-	var c int16 = 1
-	fmt.Println(ToBool(a))
-	fmt.Println(ToBool(b))
-	fmt.Println(ToBool(c))
-	fmt.Println(ToBool("1"))
-	fmt.Println(ToBool("2"))
-	fmt.Println(ToBool("0"))
-	fmt.Println(ToBool(false))
-	fmt.Println(ToBool(true))
-}
-
-func TestGetNowTimeByFormatStr(t *testing.T) {
-	fmt.Println(GetNowTimeByFormatStr("20060102_150405"))
+func TestGetResultBeanByJson(t *testing.T) {
+	s := `付成都你六姐（青浦宝龙店）马祥3月工资李如秀（小时工2月薪资）工时96小时。
+银行卡号：620522001030693446`
+	a, e := jsonutil.StrToJson(s)
+	fmt.Println(a, e)
+	b := GetResultBeanByJson(s)
+	fmt.Println(b)
+	fmt.Println(a.String())
 }

@@ -3,13 +3,11 @@ package main
 import (
 	"fmt"
 
-	"github.com/luoliDark/base/db/enum"
-
-	"github.com/luoliDark/base/db/conn"
+	"github.com/luoliDark/base/util/commutil"
 )
 
 func main() {
-	en, _ := conn.GetDBConnection("", true, enum.DianShang)
+	a := float64(312.12312312321)
 
-	fmt.Println(en)
+	fmt.Println(commutil.ToString(a))
 }

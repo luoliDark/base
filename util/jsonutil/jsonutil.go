@@ -4,23 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/luoliDark/base/sysmodel"
+	"github.com/luoliDark/base/util/commutil"
 	"github.com/valyala/fastjson"
 )
 
 // map 转json 字符串
 func MapToJson(data map[string]interface{}) (string, error) {
-	bytes, err := json.Marshal(data)
-	if err != nil {
-		/// 转换失败
-		fmt.Errorf("map转json 失败," + err.Error())
-
-		return "", err
-	}
-	return string(bytes), nil
-}
-
-func ListModelToJson(data []sysmodel.Sys_UserWeiXin) (string, error) {
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		/// 转换失败
@@ -56,12 +45,18 @@ func ObjToJson(data interface{}) (string, error) {
 }
 
 // struct 数组转json
-func StructToJson(data interface{}) (string, error) {
-	return ObjToJson(data)
+func StructListToJson(data []interface{}) (string, error) {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		/// 转换失败
+		fmt.Errorf("struct数组 转json 失败," + err.Error())
+
+		return "", err
+	}
+	return string(bytes), nil
 }
 
-// struct 数组转json
-func StructListToJson(data []interface{}) (string, error) {
+func StructToJson(data interface{}) (string, error) {
 	bytes, err := json.Marshal(data)
 	if err != nil {
 		/// 转换失败
@@ -85,7 +80,7 @@ func StrToJson(json string) (*fastjson.Value, error) {
 
 // json 字符串转struct 对象
 func JsonToStruct(jsonstr string, tar interface{}) (interface{}, error) {
-	err := json.Unmarshal([]byte(jsonstr), tar)
+	err := json.Unmarshal([]byte(jsonstr), &tar)
 	if err != nil {
 		fmt.Errorf("json 转 struct 失败," + err.Error())
 
@@ -95,9 +90,9 @@ func JsonToStruct(jsonstr string, tar interface{}) (interface{}, error) {
 }
 
 // json 格式转map 字典
-func JsonToMap(jsonstr string) (map[string]interface{}, error) {
+func StrToMapInterface(jsonstr string) (map[string]interface{}, error) {
 	var result map[string]interface{}
-	err := json.Unmarshal([]byte(jsonstr), result)
+	err := json.Unmarshal([]byte(jsonstr), &result)
 	if err != nil {
 		fmt.Errorf("json 转map 失败," + err.Error())
 
@@ -122,4 +117,54 @@ func InterfaceToMap(datamap interface{}) (map[string]interface{}, error) {
 		return nil, err
 	}
 	return result, nil
+}
+
+func FastJsonToMapString(datamap *fastjson.Value) (map[string]string, error) {
+	var interfaceMap = make(map[string]interface{})
+	var bytes = make([]byte, 0)
+	bytes = datamap.MarshalTo(bytes)
+	err := json.Unmarshal(bytes, &interfaceMap)
+	if err != nil {
+		fmt.Errorf("json 转map 失败," + err.Error())
+
+		return nil, err
+	}
+	var resultmap = make(map[string]string)
+	for key, value := range interfaceMap {
+		switch value.(type) {
+		case string:
+			resultmap[key] = commutil.ToString(value)
+		default:
+			var valuestr, _ = StructToJson(value)
+			resultmap[key] = valuestr
+		}
+	}
+	return resultmap, nil
+}
+
+// InterfaceToStruct 随意对象转换为对象
+func InterfaceToStruct(obj interface{}, tar interface{}) (interface{}, error) {
+	var jsonstr, err = StructToJson(obj)
+	if nil != err {
+		fmt.Errorf("struct 转 json 失败," + err.Error())
+		return nil, err
+	}
+	err = json.Unmarshal([]byte(jsonstr), &tar)
+	if err != nil {
+		fmt.Errorf("json 转 struct 失败," + err.Error())
+
+		return nil, err
+	}
+	return tar, nil
+}
+
+// StringToStruct 随意对象转换为对象
+func StringToStruct(jsonstr string, tar interface{}) (interface{}, error) {
+	err := json.Unmarshal([]byte(jsonstr), &tar)
+	if err != nil {
+		fmt.Errorf("json 转 struct 失败," + err.Error())
+
+		return nil, err
+	}
+	return tar, nil
 }

@@ -2,7 +2,9 @@ module github.com/luoliDark/base
 
 go 1.18
 
+
 require (
+    github.com/360EntSecGroup-Skylar/excelize v1.4.1
 	github.com/Lofanmi/pinyin-golang v0.0.0-20211114132645-1db892057f20
 	github.com/Unknwon/goconfig v1.0.0
 	github.com/denisenkom/go-mssqldb v0.12.3
@@ -15,13 +17,11 @@ require (
 	github.com/rs/zerolog v1.29.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/tealeg/xlsx v1.0.5
+	github.com/tjfoc/gmsm v1.4.1
 	github.com/valyala/fastjson v1.6.4
-    github.com/wumansgy/goEncrypt v0.0.0-20190822060801-cf9a6f8787e4
+	github.com/wumansgy/goEncrypt v0.0.0-20190822060801-cf9a6f8787e4
 	github.com/xormplus/xorm v0.0.0-20210822100304-4e1d4fcc1e67
 	xorm.io/core v0.7.3
-)
-
-require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/Chronokeeper/anyxml v0.0.0-20160530174208-54457d8e98c6 // indirect
 	github.com/CloudyKit/fastprinter v0.0.0-20200109182630-33d98a066a53 // indirect
@@ -56,6 +56,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.16 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180228061459-e0a39a4cb421 // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.6 // indirect
 	github.com/smartystreets/goconvey v1.8.0 // indirect

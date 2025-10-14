@@ -5,13 +5,18 @@ package commutil
 import (
 	"bytes"
 	"container/list"
+	"crypto/md5"
 	"encoding/json"
 	"fmt"
+	"io"
+	"math/rand"
 	"net"
 	"net/http"
+	"reflect"
 	"regexp"
 	"runtime"
 	"runtime/debug"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,11 +28,55 @@ import (
 	"github.com/luoliDark/base/sysmodel/logtype"
 	"github.com/luoliDark/base/util/snow"
 	uuid "github.com/satori/go.uuid"
-	"github.com/valyala/fastjson"
 )
+
+// 转为千分位
+func NumToQianFW(num interface{}) string {
+
+	str := ToString(num)
+
+	arr := strings.Split(str, ".")
+	numStr := arr[0] //如果有小数获取整数部分
+	var fnm string
+	if len(arr) > 1 {
+		fnm = arr[1]
+	}
+	length := len(numStr)
+	if length < 4 {
+
+		if !g.IsEmpty(fnm) {
+			fnm = strings.TrimRight(fnm, "0") //去除小数点后的00
+			if !g.IsEmpty(fnm) {
+				numStr += "." + fnm
+			}
+		}
+
+		return numStr
+	}
+
+	count := (length - 1) / 3 //取于-有多少组三位数
+	for i := 0; i < count; i++ {
+		s1 := numStr[:length-(i+1)*3]
+		s2 := numStr[length-(i+1)*3:]
+		numStr = s1 + "," + s2
+	}
+
+	if !g.IsEmpty(fnm) {
+		fnm = strings.TrimRight(fnm, "0") //去除小数点后的00
+		if !g.IsEmpty(fnm) {
+			numStr += "." + fnm
+		}
+	}
+	return numStr
+}
 
 func GetUniqueId() string {
 	worker := snow.GetInstance().GetWorker()
+	//worker, err := snow.NewWorker(1)
+	//if err != nil {
+	//	fmt.Print(err.Error())
+	//	return GetUUID()
+	//}
 	return ToString(worker.NextId())
 }
 
@@ -43,23 +92,6 @@ func AppendStr(str ...interface{}) string {
 	return bufer.String()
 }
 
-//替换特殊字符
-func ReplaceSpchar(val string) string {
-
-	if strings.Contains(val, "\t") {
-		val = strings.ReplaceAll(val, "\t", " ")
-	}
-
-	if strings.Contains(val, "\n") {
-		val = strings.ReplaceAll(val, "\n", "\\n")
-	}
-
-	if strings.Contains(val, "\r") {
-		val = strings.ReplaceAll(val, "\r", "\\r")
-	}
-	return val
-}
-
 // 转为Int型  注：根据操作系统是32 或64 自动转换
 func ToInt(str interface{}) int {
 
@@ -71,10 +103,17 @@ func ToInt(str interface{}) int {
 	switch vv := str.(type) {
 	case string:
 		re, _ = strconv.Atoi(vv)
-	case int64, int, int16, int8, int32:
+	case int64:
 		re = gconv.Int(str)
-	case float64, float32:
+	case float64:
 		re = gconv.Int(str)
+	case bool:
+		b := gconv.Bool(str)
+		if b {
+			re = 1
+		} else {
+			re = 0
+		}
 	default:
 		re = gconv.Int(str)
 	}
@@ -83,7 +122,7 @@ func ToInt(str interface{}) int {
 
 }
 
-// 转 64
+// 转为Int型  注：根据操作系统是32 或64 自动转换
 func ToInt64(str interface{}) int64 {
 
 	if str == nil || g.IsEmpty(str) {
@@ -93,24 +132,37 @@ func ToInt64(str interface{}) int64 {
 	var re int64
 	switch vv := str.(type) {
 	case string:
-		re, _ = strconv.ParseInt(vv, 10, 64)
+		tmp, _ := strconv.Atoi(vv)
+		re = gconv.Int64(tmp)
 	case int64:
-		re = vv
+		re = gconv.Int64(str)
 	case float64:
 		re = gconv.Int64(str)
-	default:
-		tmp, ok := str.(int64)
-		if !ok {
-			_, file, line, _ := runtime.Caller(2)
-			fmt.Println(str, "转换为int64失败")
-			loghelper.ByError("数据转换int64失败", ToString(vv)+file+ToString(line), "")
+	case bool:
+		b := gconv.Bool(str)
+		if b {
+			re = 1
 		} else {
-			re = tmp
+			re = 0
 		}
+	default:
+		re = gconv.Int64(str)
 	}
 
 	return re
 
+}
+
+func ToTime(str interface{}) time.Time {
+	if IsNullOrEmpty(str) {
+		return time.Now()
+	}
+	time, e := time.Parse("2006-01-02", ToString(str))
+	if e != nil {
+		fmt.Println(str, "转换为Time失败")
+		panic("转换日期失败，" + e.Error())
+	}
+	return time
 }
 
 // 转为String
@@ -148,6 +200,7 @@ func ToString(str interface{}) string {
 			ba = append(ba, b)
 		}
 		re = string(ba)
+
 	case int, int32:
 		re = strconv.Itoa(str.(int))
 	case int64:
@@ -155,7 +208,8 @@ func ToString(str interface{}) string {
 	case float32:
 		re = strconv.FormatFloat(float64(vv), 'f', 6, 64)
 	case float64:
-		re = strconv.FormatFloat(vv, 'E', -1, 64) //float64
+		re = strconv.FormatFloat(vv, 'f', 6, 64)
+		//re = strconv.FormatFloat(vv, 'E', -1, 64) //float64  这样转出来会有E字母
 	case bool:
 		re = strconv.FormatBool(vv)
 	case time.Time:
@@ -167,11 +221,36 @@ func ToString(str interface{}) string {
 		} else {
 			re = MapToStr(m)
 		}
+
+	case []string:
+
+		var sbStr strings.Builder
+		for _, b := range vv {
+			sbStr.WriteString(b)
+		}
+		re = sbStr.String()
+
 	default:
 		re = fmt.Sprint(str)
+		if !ok {
+			_, file, line, _ := runtime.Caller(2)
+			fmt.Println(str, "转换为string失败")
+			loghelper.ByError(logtype.DataTypeErr, file+ToString(line), "")
+		}
 	}
 
 	return re
+}
+
+// 转保留2位小数
+func ToF2(value interface{}) float64 {
+
+	newV, err := strconv.ParseFloat(fmt.Sprintf("%.2f", value), 64)
+	if err != nil {
+		newV = ToFloat64(value)
+	}
+	return newV
+
 }
 
 // 转为Float64
@@ -192,10 +271,10 @@ func ToFloat64(str interface{}) float64 {
 		re = a
 	case float64:
 		re = vv
-	case int, int8, int64, int16, int32:
-		re = float64(ToInt(vv))
+	case int:
+		re = float64(vv)
 	default:
-		a, err := strconv.ParseFloat(ToString(str), 64)
+		a, err := strconv.ParseFloat(ToString(vv), 64)
 		if err != nil {
 			_, file, line, _ := runtime.Caller(2)
 			fmt.Println(str, "转换为ToFloat64失败")
@@ -203,7 +282,6 @@ func ToFloat64(str interface{}) float64 {
 		}
 		re = a
 	}
-
 	return re
 
 }
@@ -214,32 +292,20 @@ func ToFloat32(str interface{}) float32 {
 	if str == nil || g.IsEmpty(str) {
 		return 0
 	}
-
 	var re float32
 
 	switch vv := str.(type) {
-	case string:
-		a, err := strconv.ParseFloat(vv, 32)
+	case float64:
+		re = float32(vv)
+	default:
+		a, err := strconv.ParseFloat(ToString(str), 32)
 		if err != nil {
 			_, file, line, _ := runtime.Caller(2)
 			fmt.Println(str, "转换为ToFloat32失败")
 			loghelper.ByError(logtype.DataTypeErr, ToString(vv)+file+ToString(line), "")
 		}
 		re = float32((a))
-	case float64:
-		re = float32(vv)
-	case int:
-		re = float32(vv)
-	default:
-		a, err := strconv.ParseFloat(ToString(str), 32)
-		if err != nil {
-			_, file, line, _ := runtime.Caller(2)
-			fmt.Println(str, "转换为ToFloat64失败")
-			loghelper.ByError(logtype.DataTypeErr, ToString(vv)+file+ToString(line), "")
-		}
-		re = float32(a)
 	}
-
 	return re
 
 }
@@ -249,7 +315,14 @@ func RmEle(slice []interface{}, index int) []interface{} {
 	return append(slice[:index], slice[index+1:])
 }
 
-//转换类型
+func IsTrue(value interface{}) bool {
+	return ToBool(value)
+}
+func IsFalse(value interface{}) bool {
+	return !ToBool(value)
+}
+
+// 转换类型
 func ToBool(value interface{}) bool {
 
 	if value == nil {
@@ -257,17 +330,16 @@ func ToBool(value interface{}) bool {
 	}
 
 	result := false
-	switch value.(type) {
+	switch value := value.(type) {
 	case bool:
-		result = value.(bool)
+		result = value
 	case int, int8, int16, int32, int64, uint8, uint16, uint32, uint64:
-		//gconv.Bool()
-		if gconv.Int(value) == 1 {
+
+		if value == 1 {
 			result = true
 		} else {
 			result = false
 		}
-
 	case string:
 		if value == "true" || value == "1" {
 			result = true
@@ -289,6 +361,37 @@ func GetUUID() string {
 	return uuid_str
 }
 
+// GenerateUniqueShortIDAndKeyWord 生成指定长度的唯一键
+func GenerateUniqueShortIDAndKeyWord(keyword string, length int) string {
+	timestamp := time.Now().UnixNano()           // 获取当前时间戳（纳秒）
+	random := rand.Int63()                       // 获取一个随机数（int64）
+	id := ToString(timestamp) + ToString(random) // 将结果转换为16进制字符串
+	var keyWrodLength = 0
+	if !IsNullOrEmpty(keyword) {
+		keyWrodLength = len(keyword)
+	}
+	length = length - keyWrodLength
+	if len(id) > length { // 如果结果超过了指定长度，则截取
+		id = id[:length]
+	} else if len(id) < length { // 如果结果短于指定长度，则填充0（可选）
+		id = fmt.Sprintf("%0"+strconv.Itoa(length)+"s", id)
+	}
+	return keyword + id
+}
+
+func GenerateUniqueShortID(length int) string {
+	timestamp := time.Now().UnixNano() // 获取当前时间戳（纳秒）
+	random := rand.Int63()             // 获取一个随机数（int64）
+	combined := timestamp ^ random     // 结合时间戳和随机数，确保唯一性（XOR操作）
+	id := fmt.Sprintf("%x", combined)  // 将结果转换为16进制字符串
+	if len(id) > length {              // 如果结果超过了指定长度，则截取
+		id = id[:length]
+	} else if len(id) < length { // 如果结果短于指定长度，则填充0（可选）
+		id = fmt.Sprintf("%0"+strconv.Itoa(length)+"s", id)
+	}
+	return id
+}
+
 // byte 数组转string
 func B2S(bs []byte) string {
 	bys := new(bytes.Buffer)
@@ -308,12 +411,42 @@ const Time_Fomat07 = "20060102"
 const Time_Fomat08 = "20060102150405.000"
 const Time_Fomat09 = "150405"
 const Time_Fomat10 = "060102150405"
+const Time_Fomat11 = "2006-01"
 const Time_Fomat12 = "2006-01-02 15:04:05.000" //时分秒毫秒
 
 // 时间格式化
 func TimeFormat(date time.Time, formater string) string {
+
+	if formater == Time_Fomat11 {
+		s := time.Unix(date.Unix(), 0).Format(Time_Fomat03)
+		arr := strings.Split(s, "-")
+		if len(arr) >= 2 {
+			return arr[0] + "-" + arr[1]
+		} else {
+			return ""
+		}
+
+	} else {
+		// 时间格式转换
+		return time.Unix(date.Unix(), 0).Format(formater)
+	}
+
+}
+
+// 时间格式化
+func TimParse(date string, formater string) time.Time {
+
+	date = strings.ReplaceAll(date, "\t", "")
+	date = strings.ReplaceAll(date, "\r", "")
+	date = strings.ReplaceAll(date, "\n", "")
+
 	// 时间格式转换
-	return time.Unix(date.Unix(), 0).Format(formater)
+	timeval, e := time.Parse(formater, date)
+	if nil != e {
+		panic("时间转换失败：" + e.Error() + "传入的时间是：" + date)
+	}
+
+	return timeval
 }
 
 // 获取 客户端请求 ip 地址
@@ -336,6 +469,19 @@ func GetLangCode() (langCode string) {
 
 }
 
+func ArrayToString(arrays []string) string {
+	var result = ""
+	//遍历数组拼接字符串
+	for _, v := range arrays {
+		result += v + ","
+	}
+	//判断是否为空
+	if !IsNullOrEmpty(result) {
+		result = result[0 : len(result)-1]
+	}
+	return result
+}
+
 func ForListFindElement(list *list.List, index int) (obj *list.Element) {
 	var i = 0
 	for element := list.Front(); nil != element; element = element.Next() {
@@ -347,11 +493,22 @@ func ForListFindElement(list *list.List, index int) (obj *list.Element) {
 	return obj
 }
 
+// 从字符串找提出纯数字
+func GetNumberFromStr(str string) string {
+	reg := regexp.MustCompile(`[0-9]`)
+	s2 := reg.FindAllString(str, -1)
+	return strings.Join(s2, "")
+}
+
 func IsNullOrEmpty(obj interface{}) bool {
 	if "" == obj || nil == obj {
 		return true
 	}
 	return false
+}
+
+func IsNotNullOrEmpty(obj interface{}) bool {
+	return !IsNullOrEmpty(obj)
 }
 
 func CheckClassType(obj string, classType string) bool {
@@ -396,7 +553,7 @@ func CheckClassType(obj string, classType string) bool {
 	return true
 }
 
-//从list中查找指定数据的下标
+// 从list中查找指定数据的下标
 func Find(slice []string, val interface{}) (int, bool) {
 	for i, item := range slice {
 		if item == val {
@@ -406,7 +563,7 @@ func Find(slice []string, val interface{}) (int, bool) {
 	return -1, false
 }
 
-//将生成的json封装成resultbean 格式的json返回
+// 将生成的json封装成resultbean 格式的json返回
 func GetResultBeanByJson(jsonStr string) string {
 
 	if jsonStr == "" {
@@ -418,11 +575,11 @@ func GetResultBeanByJson(jsonStr string) string {
 	}
 }
 
-//rows转map 注只限定查出两名
+// rows转map[string]map[string]string
 func RowsToMapVsMap(rows []map[string]string, key string) map[string]map[string]string {
 	resultM := make(map[string]map[string]string)
 	if len(rows) == 0 {
-		return make(map[string]map[string]string)
+		return resultM
 	} else {
 		for _, m := range rows {
 			k := m[key]
@@ -434,7 +591,7 @@ func RowsToMapVsMap(rows []map[string]string, key string) map[string]map[string]
 	return resultM
 }
 
-//rows转map[string]map[string]string
+// rows转map[string]map[string]string
 func RowsToMapList(key string, rows []map[string]string) map[string]map[string]string {
 	resultM := make(map[string]map[string]string)
 	if len(rows) == 0 {
@@ -443,39 +600,50 @@ func RowsToMapList(key string, rows []map[string]string) map[string]map[string]s
 		for _, m := range rows {
 			k := m[key]
 			if k != "" {
-				resultM[k] = m
+				_, ok := resultM[k]
+				if ok {
+					//相同的key  并且已经删除则跳过
+					if m["isdiscard"] == "1" {
+						continue
+					}
+					resultM[k] = m
+				} else {
+					resultM[k] = m
+				}
 			}
+
 		}
 	}
 	return resultM
 }
 
-//rows转map 注只限定查出两名并且别名必须为k,v
+// rows转map 注只限定查出两名并且别名必须为k,v
 func RowsToMap(rows []map[string]string) map[string]string {
-	return RowsToMapByKeys(rows, "k", "v")
-}
 
-//rows转map 注只限定查出两名
-func RowsToMapByKeys(rows []map[string]string, key, value string) map[string]string {
 	resultM := make(map[string]string)
-	if len(rows) == 0 {
-		return resultM
+	if rows == nil {
+		return make(map[string]string)
 	} else {
 		for _, m := range rows {
-			k := m[key]
-			v := m[value]
-			if k != "" {
-				resultM[k] = v
+			key := m["k"]
+			value := m["v"]
+			if key != "" {
+				resultM[key] = value
 			}
 		}
 	}
+
 	return resultM
+
 }
 
-//rows转map 注只限定查出两名并且别名必须为k,v
+// rows转map 注只限定查出两名并且别名必须为k,v
 func RowsToSyncMap(rows []map[string]string) sync.Map {
+
 	resultM := sync.Map{}
-	if len(rows) > 0 {
+	if rows == nil {
+		return sync.Map{}
+	} else {
 		for _, m := range rows {
 			key := m["k"]
 			value := m["v"]
@@ -484,6 +652,7 @@ func RowsToSyncMap(rows []map[string]string) sync.Map {
 			}
 		}
 	}
+
 	return resultM
 
 }
@@ -499,7 +668,7 @@ func GetSyncMapValue(mapObj sync.Map, key string) interface{} {
 	return ""
 }
 
-//rows 将指定字段转为以豆号分隔的字符串
+// rows 将指定字段转为以豆号分隔的字符串
 func RowsToIdStrByCol(rows []map[string]string, splitCol string) string {
 
 	var ids strings.Builder
@@ -520,7 +689,26 @@ func RowsToIdStrByCol(rows []map[string]string, splitCol string) string {
 
 }
 
-//rows 将指定数组转为以豆号分隔的字符串
+// rows 某个字段转为数组
+func RowsToArr(rows []map[string]string) []string {
+
+	if rows == nil {
+		return nil
+	} else {
+
+		lst := make([]string, len(rows))
+		for index, m := range rows {
+			key := m["id"]
+			lst[index] = key
+		}
+
+		return lst
+
+	}
+
+}
+
+// rows 将指定数组转为以豆号分隔的字符串
 func RowsToIdStrByArr(rows []string) string {
 
 	var ids strings.Builder
@@ -540,18 +728,17 @@ func RowsToIdStrByArr(rows []string) string {
 
 }
 
-//将 1,2,3 转为 ‘1’，‘2’，‘3’
+// 将 1,2,3 转为 ‘1’，‘2’，‘3’
 func StringsToIdStr(ids string) string {
 	return RowsToIdStrByArr(strings.Split(ids, ","))
 }
 
-//将1，2，3 转为[1,2,3]
-func IdsToArray(ids string, splitChar string) []string {
-	return strings.Split(ids, splitChar)
-}
-
-//将map的key转为 ‘1’，‘2’，‘3’
+// 将map的key转为 ‘1’，‘2’，‘3’
 func MapToIdStr(m map[string]string) string {
+	if m == nil {
+		return ""
+	}
+
 	var ids bytes.Buffer
 	for key, _ := range m {
 		if key != "" {
@@ -563,7 +750,7 @@ func MapToIdStr(m map[string]string) string {
 	return strings.TrimRight(ids.String(), ",")
 }
 
-//将map中的k,v转为字符串 ，用行记录map中数据对日志
+// 将map中的k,v转为字符串 ，用行记录map中数据对日志
 func MapToStr(m map[string]string) string {
 
 	if m == nil {
@@ -616,40 +803,86 @@ func FormatDateTime(dateparam time.Time) string {
 }
 
 // time 指定格式转 string
-func GetNowTimeByFormatStr(Format string) string {
+func TimeFormatStr(Format string) string {
 	return time.Now().Format(Format)
 }
 
-//将时间戳转换为日期 针对毫秒级
-func TimeSpanToDate(timeUnix int64) time.Time {
-	tu := int64(timeUnix / 1000)
-
-	t := time.Unix(tu, 0) //先转为秒再转日期
-
-	return t
+// 获取当前 时间
+func GetNowTime() string {
+	dateparam := time.Now()
+	return dateparam.Format(Time_Fomat01)
 }
 
-//将时间戳转换为日期
-func StrToDateTime(t1 string) time.Time {
-	time, err := time.ParseInLocation("2006-01-02 15:04:05", t1, time.Local)
-	if err != nil {
-		loghelper.ByError("将时间戳转换为日期失败", err.Error()+" 转换的字符串="+t1, "")
-	}
-	return time
+// 获取当前 时间 2006-01-02
+func GetNowYYDDMM() string {
+	dateparam := time.Now()
+	return dateparam.Format(Time_Fomat03)
 }
 
-//获取rest层捕到的全部服务器错误
+// 获取当前 时间 20060102150405
+func GetNowYYYYMMDDHHmmss() string {
+	dateparam := time.Now()
+	return dateparam.Format(Time_Fomat06)
+}
+
+func GetNowByFormat(layout string) string {
+	dateparam := time.Now()
+	return dateparam.Format(layout)
+}
+
+// 获取当前 时间 20060102
+func GetNowYYYYMMDD() string {
+	dateparam := time.Now()
+	return dateparam.Format(Time_Fomat07)
+}
+
+// 获取当前 时间 含毫秒
+func GetNowYYYYMMDDHHMMSSsss() string {
+	dateparam := time.Now()
+	format := dateparam.Format(Time_Fomat08)
+	replace := strings.Replace(format, ".", "", 1)
+	return replace
+}
+
+// 获取当前年份
+func GetNowYear() int {
+	return time.Now().Year()
+}
+
+// 获取当前月份
+func GetNowMonth() int {
+	return int(time.Now().Month())
+}
+
+// 获取rest层捕到的全部服务器错误
 func GetHttpCatchErrMsg(err interface{}, userId string) string {
-	errbuf := bytes.Buffer{}
+	errstr := "内部错误"
+	if s := GetCatchErrMsg(err); s != "" {
+		errstr += s
+	}
 	stack := ToString(debug.Stack())
-	errbuf.WriteString(fmt.Sprint(err)) // error 和 string 等类型 都能获取到对应值。
-	errstr := errbuf.String()
-
-	loghelper.ByRestCatchErr("自动捕获到异常，", AppendStr(errstr, "; 源代码文件 : ", stack), userId)
+	loghelper.ByRestCatchErr("rest请求错误", errstr+" 源代码文件："+stack, userId)
 	return errstr
 }
 
-//将对象转为json
+// 获取rest层捕到的全部服务器错误
+func GetCatchErrMsg(err interface{}) string {
+	errType := reflect.TypeOf(err).Name()
+	errstr := ""
+	if errType == "error" {
+		newErr := err.(error)
+		if newErr != nil {
+			errstr += newErr.Error()
+		}
+	} else if errType == "string" {
+		errstr += ToString(err)
+	} else {
+		errstr = fmt.Sprint(err)
+	}
+	return errstr
+}
+
+// 将对象转为json
 func ObjectToJson(obj interface{}) string {
 	js3, err := json.Marshal(obj)
 	if err != nil {
@@ -659,14 +892,62 @@ func ObjectToJson(obj interface{}) string {
 	}
 }
 
-//将对象转为json
-func ToJson(obj interface{}) string {
-	js3, err := json.Marshal(obj)
-	if err != nil {
-		return "convert err"
-	} else {
-		return ToString(js3)
+type reflectWithString struct {
+	v reflect.Value
+	s string
+}
+
+func StructToJSONStr(obj interface{}) string {
+	t := reflect.TypeOf(obj)
+	v := reflect.ValueOf(obj)
+	//var data = make(map[string]interface{})
+	sv := make([]string, t.NumField())
+	for i := 0; i < t.NumField(); i++ {
+		sv[i] = t.Field(i).Name
+		//data[t.Field(i).Name] = v.Field(i).Interface()
 	}
+	sort.Slice(sv, func(i, j int) bool { return sv[i] < sv[j] })
+	var result bytes.Buffer
+	result.WriteString("{")
+	for i, key := range sv {
+
+		field := v.FieldByName(key)
+		fieldValue := field.Interface()
+		switch field.Kind() {
+		case reflect.Struct:
+			result.WriteString("\"" + key + "\":")
+			structResult := StructToJSONStr(fieldValue)
+			result.WriteString(structResult)
+		case reflect.Slice:
+			result.WriteString("\"" + key + "\":[")
+			//array := fieldValue.([]interface{})
+			of := reflect.ValueOf(fieldValue)
+			for i := 0; i < of.Len(); i++ {
+				index := of.Index(i)
+				structObj := index.Interface()
+				result.WriteString("\"" + key + "\":")
+				structResult := StructToJSONStr(structObj)
+				result.WriteString(structResult)
+				if i < of.Len()-1 {
+					result.WriteString(",")
+				}
+			}
+			//for _,obj := range array{
+			//	result.WriteString("\""+key+"\":")
+			//	structResult := StructToMap(obj)
+			//	result.WriteString(structResult)
+			//}
+			result.WriteString("]")
+		default:
+			result.WriteString("\"" + key + "\":\"" + ToString(fieldValue) + "\"")
+		}
+		if i < len(sv)-1 {
+			result.WriteString(",")
+		}
+	}
+	result.WriteString("}")
+
+	return result.String()
 }
 
 func IsIntType(sqlDataType string) bool {
@@ -681,7 +962,8 @@ func IsIntType(sqlDataType string) bool {
 	return sqlDataType == ("number") || strings.Contains(sqlDataType, "int") || strings.HasPrefix(sqlDataType, "decimal(")
 }
 
-/**
+/*
+*
 根据传入map[string]string转换为map[string]interface
 */
 func TypeConverter(datalist []map[string]string) []map[string]interface{} {
@@ -698,7 +980,8 @@ func TypeConverterMapString(datalist map[string]interface{}) map[string]string {
 	return resultdata.(map[string]string)
 }
 
-/**
+/*
+*
 根据传入时间获取前一年时间戳
 */
 func GetNowTimeBeforeYear(date time.Time) int64 {
@@ -708,17 +991,18 @@ func GetNowTimeBeforeYear(date time.Time) int64 {
 	return beforeYearTime.Unix()
 }
 
-//捕获ajax请求后台服务器错误
+// 捕获ajax请求后台服务器错误
 func CatchError() {
 	if err := recover(); err != nil {
-		GetHttpCatchErrMsg(err, "-1")
+		errMsg := GetHttpCatchErrMsg(err, "-1")
+		loghelper.ByError("自动捕获到异常", errMsg, "-1")
 	}
 }
 
-//捕获ajax请求后台服务器错误
-func CatchErrorByTitle(title string) {
+func CatchError2(errType string) {
 	if err := recover(); err != nil {
-		GetHttpCatchErrMsg(fmt.Sprintf("title:%v,err:%v", title, err), "-1")
+		errMsg := GetHttpCatchErrMsg(err, "-1")
+		loghelper.ByError(errType+"自动捕获到异常", errMsg, "-1")
 	}
 }
 
@@ -729,24 +1013,6 @@ func If(condition bool, trueVal, falseVal interface{}) string {
 	return ToString(falseVal)
 }
 
-func AssmblyMap(valuemap map[string]string, key string, valueObj *fastjson.Value) map[string]string {
-	var value = valueObj.Get(key)
-	//println("map获取的值："+key+"=============="+ToString(value))
-	if nil != value && !IsNullOrEmpty(value) {
-		var result = value.String()
-		//println("map获取到的值"+result)
-		if result == "true" {
-			result = "1"
-		} else if result == "false" {
-			result = "0"
-		}
-		//log.Print("map获取的值："+key+"=============="+ToString(value))
-		//println("map获取到的值：" + result)
-		valuemap[key] = strings.Trim(result, "\"")
-	}
-	return valuemap
-}
-
 func TrimStr(val string) string {
 	if !IsNullOrEmpty(val) {
 		val = strings.Trim(val, "\"")
@@ -754,118 +1020,22 @@ func TrimStr(val string) string {
 	return val
 }
 
-func IsContain(items []string, item string) bool {
-	for _, eachItem := range items {
-		if eachItem == item {
-			return true
-		}
+// rows 将指定xorm结构体转为以逗号分隔的字符串
+func ColByStruct(data interface{}) string {
+	t := reflect.TypeOf(data)
+	var str = ""
+	for i := 0; i < t.NumField(); i++ {
+		str += t.Field(i).Tag.Get("xorm") + ","
 	}
-	return false
+	return strings.TrimRight(str, ",")
 }
 
-func ListConverterMap(datamaplist []map[string]string, key string) map[string]map[string]string {
-	var resultmap = make(map[string]map[string]string)
-	///判断集合是否为空
-	for _, mapobj := range datamaplist {
-		///获取对应key
-		var value = mapobj[key]
-		if IsNullOrEmpty(value) {
-			continue
-		}
-		resultmap[ToString(value)] = mapobj
-	}
-	return resultmap
-}
-
-//获取相差时间
-func GetHourDiffer(start_time, end_time string) int64 {
-	var hour int64
-	t1, err := time.ParseInLocation(Time_Fomat01, start_time, time.Local)
-	t2, err := time.ParseInLocation(Time_Fomat01, end_time, time.Local)
-	if err == nil && t1.Before(t2) {
-		diff := t2.Unix() - t1.Unix() //
-		hour = diff / 3600
-		return hour
-	} else {
-		return hour
-	}
-}
-
-func ParentIDIsNull(parentID string) bool {
-	if parentID == "" || parentID == "0" || parentID == "undefined" || parentID == "null" {
-		return true
-	}
-	return false
-}
-
-//通过数组获取key值，组成in条件语句
-func GetListCodeStrInWhere(list []map[string]string, key string, column string) string {
-	codeStr := ""
-	if len(list) <= 0 {
-		return codeStr
-	}
-	for _, object := range list {
-		code := object[key]
-		if !IsNullOrEmpty(code) {
-			codeStr += "'" + code + "',"
-		}
-	}
-	if !IsNullOrEmpty(codeStr) {
-		codeStr = strings.TrimRight(codeStr, ",")
-		codeStr = column + " in (" + codeStr + ")"
-	}
-	return codeStr
-}
-
-//通过map键的唯一性去重
-func RemoveRepeatedElement(s []string) []string {
-	result := make([]string, 0)
-	m := make(map[string]bool) //map的值不重要
-	for _, v := range s {
-		if _, ok := m[v]; !ok {
-			if !IsNullOrEmpty(v) {
-				result = append(result, v)
-				m[v] = true
-			}
-		}
-	}
-	return result
-}
-
-//获取当前 时间
-func GetNowTime() string {
-	dateparam := time.Now()
-	return dateparam.Format(Time_Fomat01)
-}
-
-//获取当前 时间
-func GetNowYYDDMM() string {
-	dateparam := time.Now()
-	return dateparam.Format(Time_Fomat03)
-}
-
-//获取当前年份
-func GetNowYear() int {
-	return time.Now().Year()
-}
-
-//获取当前月份
-func GetNowMonth() int {
-	return time.Now().Year()
-}
-
-//转换时间 例：2021-09-08 23：22：44
-func ParseTime(timeStr string) time.Time {
-	t, err := time.Parse(Time_Fomat01, timeStr)
-	if err != nil {
-		loghelper.ByError("转换为时间失败", err.Error(), "")
-	}
-	return t
-}
-
-//转换时间 例：2021-09-08 23：22：44
-func TimeToStr(t time.Time) string {
-	return t.Format(Time_Fomat01)
+// MD5 加密
+func Md5(str string) string {
+	w := md5.New()
+	io.WriteString(w, str)
+	md5str := fmt.Sprintf("%x", w.Sum(nil))
+	return md5str
 }
 
 // 获取两个时间相差的天数，0表同一天，正数表endDay>startDay，负数表endDay<startDay
@@ -876,4 +1046,150 @@ func GetDiffDays(startDay, endDay time.Time) int {
 
 	return int(endDay.Sub(startDay).Hours() / 24)
 
+}
+
+// 计算日期相差多少月
+func GetSubMonth(startDay, endDay time.Time) (month int) {
+	y1 := endDay.Year()
+	m1 := int(endDay.Month())
+	d1 := endDay.Day()
+
+	y2 := startDay.Year()
+	m2 := int(startDay.Month())
+	d2 := startDay.Day()
+
+	yearInterval := y1 - y2
+	// 如果 d1的 月-日 小于 d2的 月-日 那么 yearInterval-- 这样就得到了相差的年数
+	if m1 < m2 || m1 == m2 && d1 < d2 {
+		yearInterval--
+	}
+	// 获取月数差值
+	monthInterval := (m1 + 12) - m2
+	if d1 < d2 {
+		monthInterval--
+	}
+	monthInterval %= 12
+	month = yearInterval*12 + monthInterval
+	return month + 1
+}
+
+// 获取字符串前几位
+func SubString(str string, startIndx, endIndex int) string {
+	rs := []rune(str)
+	d2 := string(rs[startIndx:endIndex])
+	return d2
+}
+
+// 合并map
+func MergeMap(mObj ...map[string]string) map[string]string {
+	newObj := map[string]string{}
+	for _, m := range mObj {
+		for k, v := range m {
+			newObj[k] = v
+		}
+	}
+	return newObj
+}
+
+// 合并map
+func MergeList(mObj ...[]map[string]string) []map[string]string {
+	newObj := []map[string]string{}
+	for _, m := range mObj {
+		for _, object := range m {
+			newObj = append(newObj, object)
+		}
+	}
+	return newObj
+}
+
+// TraverseMapInStringOrder 按字母顺序遍历map
+func TraverseMapInStringOrder(params map[string]string) (map[string][]string, string, map[string][]string) {
+	str := strings.Builder{}
+	var handler = make(map[string][]string)
+	var appidHandler = make(map[string][]string)
+	//第一个参数放sign
+	appidHandler["sign"] = []string{params[""]}
+	keys := make([]string, 0)
+	for k, _ := range params {
+		keys = append(keys, k)
+		appidHandler[k] = []string{params[k]}
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		handler[k] = []string{params[k]}
+		str.WriteString(k)
+		str.WriteString("=")
+		str.WriteString(params[k])
+		str.WriteString("&")
+	}
+	return handler, str.String(), appidHandler
+}
+
+// CommonTraverseMapInStringOrder 按字母顺序遍历map
+func CommonTraverseMapInStringOrder(params map[string]string) (map[string][]string, string, map[string][]string, []string) {
+	str := strings.Builder{}
+	var handler = make(map[string][]string)
+	var appidHandler = make(map[string][]string)
+	//先对key进行排序
+	keys := make([]string, 0)
+	for k, _ := range params {
+		keys = append(keys, k)
+		appidHandler[k] = []string{params[k]}
+	}
+	sort.Strings(keys)
+	//将排序后的key再次进行拼接成字符串返回
+	for _, k := range keys {
+		handler[k] = []string{params[k]}
+		str.WriteString(k)
+		str.WriteString("=")
+		str.WriteString(params[k])
+		str.WriteString("&")
+	}
+	return handler, str.String(), appidHandler, keys
+}
+
+// 按字母顺序遍历map
+func TraverseMapOrder(params map[string]string) []string {
+
+	/*	asciilist := make([]int,0)
+		for k, _ := range params {
+			asciilist = append(asciilist, gconv.Int(k))
+		}
+		sort.Ints(asciilist)
+		keys := make([]string, 0)
+		for _, k := range asciilist {
+			keys = append(keys, string(k))
+		}*/
+	keys := make([]string, 0)
+	for k, _ := range params {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+// Web 参数替换 undefined null 空
+func ReplaceWebEmptyParams(s string) string {
+	if s == "undefined" || s == "null" {
+		return ""
+	}
+	return s
+}
+
+// 字符串切片去重
+func RemoveRepeatedElement(arr []string) (newArr []string) {
+	newArr = make([]string, 0)
+	for i := 0; i < len(arr); i++ {
+		repeat := false
+		for j := i + 1; j < len(arr); j++ {
+			if arr[i] == arr[j] {
+				repeat = true
+				break
+			}
+		}
+		if !repeat {
+			newArr = append(newArr, arr[i])
+		}
+	}
+	return newArr
 }

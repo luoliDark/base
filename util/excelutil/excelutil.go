@@ -2,6 +2,8 @@ package excelutil
 
 import (
 	"container/list"
+	"fmt"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -9,11 +11,21 @@ import (
 	"time"
 
 	"github.com/luoliDark/base/confighelper"
-
+	"github.com/luoliDark/base/redishelper/rediscache"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/util/commutil"
+
 	"github.com/tealeg/xlsx"
+	"github.com/xormplus/xorm"
 )
+
+type ExportInfo struct {
+	TitleList []TtileByKey
+	Name      string
+	SheetName string
+	Path      string
+	WebPath   string
+}
 
 func GetCellString(cell *xlsx.Cell) (cellString string) {
 
@@ -47,6 +59,13 @@ func GetCellString(cell *xlsx.Cell) (cellString string) {
 	return cellString
 }
 
+//替换回车符号
+func ReplaceRNT(cellValue string) string {
+	cellValue = strings.Replace(cellValue, "\n", " ", -1)
+	cellValue = strings.Replace(cellValue, "\r", " ", -1)
+	cellValue = strings.Replace(cellValue, "\t", " ", -1)
+	return cellValue
+}
 func RemoveZero(value string) string {
 	if "" == value {
 		return ""
@@ -76,27 +95,18 @@ func GetStringValueFromCell(cell *xlsx.Cell) string {
 	} else if strings.Index(cell.NumFmt, "h:") >= 0 {
 		cellValue = convertToFormatTime(cell.Value) //时分秒
 	} else if strings.Index(cell.NumFmt, "yy") >= 0 {
-		b, err := strconv.Atoi(cell.Value)
-		if err != nil {
-			//转成数字失败，不是日期类型（有些文本字段被设置为日期格式了）。不做处理。继续流转
-		} else {
-			return convertToFormatDay(b)
-		}
-	}
 
-	if cell.Type() == xlsx.CellTypeString {
+		cellValue = convertToFormatDay(cell.Value)
+	} else if cell.Type() == xlsx.CellTypeString {
 		cellValue = cell.String()
 	} else if cell.Type() == xlsx.CellTypeNumeric {
-		/*if xlsx.CellTypeDate {
-			cellValue = cell.Value
-		}else {
-
-		}*/
-		cellValue, _ = cell.GeneralNumeric()
+		//GeneralNumeric Excel格式是数字类型，但是数据库字段类型是文本。正常取原值不会有问题，
+		//但此方法会把数字转成科学计数法的文本，导致异常 改成使用 GeneralNumericWithoutScientific
+		cellValue, _ = cell.GeneralNumericWithoutScientific()
 	} else if cell.Type() == xlsx.CellTypeBool {
 		cellValue = commutil.ToString(cell.Bool())
 	} else if cell.Type() == xlsx.CellTypeError {
-		return cellValue
+		cellValue = ""
 	} else if cell.Type() == xlsx.CellTypeStringFormula {
 		cellValue = cell.Formula()
 	} else if cell.Type() == xlsx.CellTypeInline {
@@ -107,9 +117,6 @@ func GetStringValueFromCell(cell *xlsx.Cell) string {
 	cellValue = strings.Replace(cellValue, "\n", " ", -1)
 	cellValue = strings.Replace(cellValue, "\r", " ", -1)
 
-	cellValue = strings.Replace(cellValue, "\"", "“", -1)
-	cellValue = strings.Replace(cellValue, "\\", "/", -1)
-	cellValue = strings.Replace(cellValue, "'", "‘", -1)
 	return cellValue
 }
 
@@ -126,12 +133,17 @@ func convertToFormatTime(excelDaysString string) string {
 }
 
 // excel日期字段格式化 yyyy-mm-dd
-func convertToFormatDay(curDiffDay int) string {
+func convertToFormatDay(excelDaysString string) string {
 	// 2006-01-02 距离 1900-01-01的天数
 	baseDiffDay := 38719 //在网上工具计算的天数需要加2天，什么原因没弄清楚
-
+	curDiffDay := excelDaysString
+	b, err := strconv.Atoi(curDiffDay)
+	if err != nil {
+		fmt.Println("时间转换失败")
+		return excelDaysString
+	}
 	// 获取excel的日期距离2006-01-02的天数
-	realDiffDay := curDiffDay - baseDiffDay
+	realDiffDay := b - baseDiffDay
 	//fmt.Println("realDiffDay:",realDiffDay)
 	// 距离2006-01-02 秒数
 	realDiffSecond := realDiffDay * 24 * 3600
@@ -232,10 +244,12 @@ func DataToExcelEntity(dataEntity []map[string]string, isMain bool, langCode str
 	if nil == dataEntity || len(dataEntity) <= 0 || commutil.IsNullOrEmpty(isMain) {
 		return listobj
 	}
-	//当前字段是否已经到处编码列
+
 	for i := 0; i < len(dataEntity); i++ {
 		tempMap := dataEntity[i]
+
 		var name = commutil.ToString(tempMap["showname"]) //name
+
 		var sqlCol = strings.ToLower(commutil.ToString(tempMap["sqlcol"]))
 		var sqlDataType = commutil.ToString(tempMap["sqldatatype"])
 		var dataSource = commutil.ToString(tempMap["datasource"])
@@ -247,15 +261,33 @@ func DataToExcelEntity(dataEntity []map[string]string, isMain bool, langCode str
 		var entity = sysmodel.ExcelEntity{}
 		///判断数据源是否为空
 		if !commutil.IsNullOrEmpty(dataSource) {
-			entity.SetIsPidSource(true)
+			if strings.Index(dataSource, "9999") == 0 {
+				//如果是字典数据源，则只能按名称
+				isConvertByName = true
+				isConvertByCode = false
+				entity.SetIsPidSource(false)
+			} else {
+				entity.SetIsPidSource(true)
+			}
 			if !isConvertByName && !isConvertByCode {
 				isConvertByName = true // isConvertByCode 原先是编码默认，现在改为名称默认
 			}
 		}
 
 		var titleName = name
+		if isConvertByCode {
+			var bianma = rediscache.GetLanguageText("label", langCode, "DsCode")
+			if xorm.IsNumeric(bianma) {
+				if langCode == "zh" {
+					bianma = "编码"
+				} else {
+					bianma = "code"
+				}
+			}
+			titleName = titleName + bianma
+		}
 
-		entity.SetShowname(titleName)
+		entity.SetShowname(name)
 		entity.SetIsConvertByCode(isConvertByCode)
 		entity.SetIsConvertByName(isConvertByName)
 		entity.SetDataSource(dataSource)
@@ -265,11 +297,38 @@ func DataToExcelEntity(dataEntity []map[string]string, isMain bool, langCode str
 		entity.SetSqlDataType(sqlDataType)
 		entity.SetTitle(titleName)
 		entity.SetIsSingle(isSingle)
-		listobj = append(listobj, entity)
 
+		listobj = append(listobj, entity)
 	}
 
 	return listobj
+}
+
+/*
+*
+读取excel并且返回数据列
+*/
+func ReadExcel(excelPath string) [][]string {
+	xlsx, err := xlsx.OpenFile(excelPath)
+	if err != nil {
+		fmt.Println("open excel error,", err.Error())
+		os.Exit(1)
+	}
+	rows := xlsx.Sheets[0].Rows
+	result := make([][]string, 0)
+	for _, row := range rows {
+		var cellIndex = len(row.Cells)
+		var valuemap = make([]string, 0)
+		for i := 0; i < cellIndex; i++ {
+			//获取值
+			value := GetStringValueFromCell(row.Cells[i])
+			valuemap = append(valuemap, value)
+		}
+		if nil != valuemap && len(valuemap) > 0 {
+			result = append(result, valuemap)
+		}
+	}
+	return result
 }
 
 func CreateExcelPath() (string, string) {

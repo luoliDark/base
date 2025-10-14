@@ -5,8 +5,9 @@ package encryptutil
 import (
 	"encoding/base64"
 	"fmt"
-	"github.com/wumansgy/goEncrypt"
 	"strings"
+
+	"github.com/wumansgy/goEncrypt"
 )
 
 //DES加密
@@ -17,15 +18,12 @@ func DesEncrypt(plainText, key []byte) (string, error) {
 		return "", err
 	}
 
-	str := base64.StdEncoding.EncodeToString(cryptText)
-	str = strings.ReplaceAll(str, "+", ".zzsoft888.") //+号
-	return str, nil
+	return base64.StdEncoding.EncodeToString(cryptText), nil
 }
 
 //DES解密
 func DesDecrypt(cipherText string, key []byte) (string, error) {
 
-	cipherText = strings.ReplaceAll(cipherText, ".zzsoft888.", "+") //转回+号
 	word, err := base64.StdEncoding.DecodeString(cipherText)
 	if err != nil {
 		return "", err
@@ -50,7 +48,7 @@ func TuoMing(str string) string {
 	for _, r := range str {
 		index++
 		s := fmt.Sprintf("%c", r)
-		if index%3 == 0 {
+		if index%4 == 0 {
 			sb.WriteString(s)
 		} else {
 			sb.WriteString("*")
