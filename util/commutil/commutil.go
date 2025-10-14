@@ -1091,6 +1091,15 @@ func MergeMap(mObj ...map[string]string) map[string]string {
 	return newObj
 }
 
+func ToJson(obj interface{}) string {
+	js3, err := json.Marshal(obj)
+	if err != nil {
+		return "convert err"
+	} else {
+		return ToString(js3)
+	}
+}
+
 // 合并map
 func MergeList(mObj ...[]map[string]string) []map[string]string {
 	newObj := []map[string]string{}
