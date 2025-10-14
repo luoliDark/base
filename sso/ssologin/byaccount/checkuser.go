@@ -5,11 +5,12 @@ import (
 	"fmt"
 
 	"github.com/luoliDark/base/db/dbhelper"
-	"github.com/luoliDark/base/loghelper"
-	"github.com/luoliDark/base/redishelper/rediscache"
 	ssomodel "github.com/luoliDark/base/sso/ssologin/model"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/sysmodel/eb"
+
+	"github.com/luoliDark/base/loghelper"
+	"github.com/luoliDark/base/redishelper/rediscache"
 	"github.com/luoliDark/base/util/commutil"
 	"github.com/luoliDark/base/util/encryptutil"
 )
@@ -23,7 +24,7 @@ func checkUserPwd(ssouser *sysmodel.SSOUser, password string) (*eb.Eb_user, erro
 		return user, errors.New("账号和密码不能为空")
 	}
 
-	has, err := engine.Where("usercode=? and ifnull(IsDiscard,0) = 0  ", ssouser.UserCode).Get(user)
+	has, err := engine.Where("usercode=?", ssouser.UserCode).Get(user)
 	if err != nil {
 		loghelper.ByError("登录失败", fmt.Sprint("登录失败,查询用户发生错误:", err.Error()), ssouser.UserID)
 		return user, errors.New("系统异常请稍后再试")
@@ -34,7 +35,7 @@ func checkUserPwd(ssouser *sysmodel.SSOUser, password string) (*eb.Eb_user, erro
 	}
 	// 用户状态，0 表示被弃用账户，1 表示有效用户，2 表示用户由于连续登陆失败被锁定,3 表示用户被冻结， 4 表示用户已过期（涉及到会员制）
 	// 检查账户是否有效
-	if user.Status == 1 || user.IsDiscard == 1 {
+	if user.Status == 1 {
 		// 账户无效
 		return user, errors.New("账号无效")
 	} else if user.Status == 2 {
@@ -87,9 +88,9 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 			user.IsOpenDingPhone = commutil.ToInt(m["isopendingphone"]) //钉钉电话通知
 
 		}
-		entM := rediscache.GetHashMap(0, 0, "eb_enterprise", user.EntID)
+		entM := rediscache.GetHashMap(commutil.ToInt(user.EntID), 0, "eb_enterprise", user.EntID)
 		if len(entM) == 0 {
-			return IsGetCompByUser, fmt.Errorf("当前登录企业未启用，请联系管理员！")
+			return IsGetCompByUser, fmt.Errorf("账号信息获取异常，请联系管理员！")
 		}
 
 		user.EnList = entvsuser
@@ -111,8 +112,8 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 			user.EnList = ent
 			user.FormEntId = entM["formentid"]
 			user.IsOpenOcr = commutil.ToBool(entM["isopenocr"])
-			user.SsoTime = commutil.ToInt(entM["ssotime"])
-			user.FileView_Ver = commutil.ToInt(entM["fileview_ver"])
+			//user.SsoTime = commutil.ToInt(entM["ssotime"])
+			//user.FileView_Ver = commutil.ToInt(entM["fileview_ver"])
 			user.IsVatDetail = commutil.ToBool(entM["isvatdetail"])
 			user.IsCostCenter = commutil.ToBool(entM["iscostcenter"])
 			user.IsExWf = commutil.ToBool(entM["isexwf"])
@@ -121,8 +122,8 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 			user.EntID = user.EnList[0].EntID
 			user.FormEntId = user.EnList[0].FormEntId
 			user.IsOpenOcr = user.EnList[0].IsOpenOcr
-			user.SsoTime = user.EnList[0].SsoTime
-			user.FileView_Ver = user.EnList[0].FileView_Ver
+			//user.SsoTime = user.EnList[0].SsoTime
+			//user.FileView_Ver = user.EnList[0].FileView_Ver
 			user.IsVatDetail = user.EnList[0].IsVatDetail
 			user.IsCostCenter = user.EnList[0].IsCostCenter
 			user.IsExWf = user.EnList[0].IsExWf
@@ -132,8 +133,8 @@ func GetUsersEnt(user *sysmodel.SSOUser) (IsGetCompByUser bool, err error) {
 			// 不能正常使用。一般手机端使用自己企业的账号， 先默认登录到用户表维护的企业，
 			user.FormEntId = entM["formentid"] //如果有2个以上企业默认fromid 就用员工本人的
 			user.IsOpenOcr = commutil.ToBool(entM["isopenocr"])
-			user.SsoTime = commutil.ToInt(entM["ssotime"])
-			user.FileView_Ver = commutil.ToInt(entM["fileview_ver"])
+			//user.SsoTime = commutil.ToInt(entM["ssotime"])
+			//user.FileView_Ver = commutil.ToInt(entM["fileview_ver"])
 			user.IsCostCenter = commutil.ToBool(entM["iscostcenter"])
 			user.IsVatDetail = commutil.ToBool(entM["isvatdetail"])
 			user.IsExWf = commutil.ToBool(entM["isexwf"])

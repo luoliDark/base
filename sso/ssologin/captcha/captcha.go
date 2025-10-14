@@ -5,6 +5,7 @@ import (
 	"image/color"
 
 	ssomodel "github.com/luoliDark/base/sso/ssologin/model"
+
 	"github.com/mojocn/base64Captcha"
 )
 

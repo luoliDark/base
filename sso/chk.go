@@ -3,23 +3,41 @@ package sso
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"github.com/gogf/gf/frame/g"
 	"github.com/luoliDark/base/confighelper"
-	"github.com/luoliDark/base/db/dbhelper"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/redishelper"
+	"github.com/luoliDark/base/redishelper/rediscache"
 	"github.com/luoliDark/base/sso/ssologin/byaccount"
 	"github.com/luoliDark/base/sso/ssologin/common"
 	"github.com/luoliDark/base/sysmodel"
-	"github.com/luoliDark/base/sysmodel/logtype"
+	"github.com/luoliDark/base/sysmodel/restentity"
 	"github.com/luoliDark/base/util/commutil"
+	"github.com/luoliDark/base/util/encryptutil"
+
+	"github.com/gin-gonic/gin"
+	"github.com/gogf/gf/frame/g"
 )
+
+var UserCheckErrorBySessionEmpty = errors.New("获取用户Session为空,请重新登录")
+
+// 接口事件调用时，根据eventPar 获取用户,
+// 用户token失效 改为从db重新获取用户信息。
+func GetUserByEventPar(eventPar *restentity.EventPar) (sysmodel.SSOUser, error) {
+	token := eventPar.Sid
+	user, err := GetUserByToken(token)
+	if err == nil {
+		//接口事件类 取传过来的entid
+		if !g.IsEmpty(eventPar.EntId) {
+			user.EntID = eventPar.EntId
+		}
+	}
+	return user, err
+}
 
 // 根据token获取用户信息
 func GetUserByToken(token string) (sysmodel.SSOUser, error) {
@@ -27,11 +45,13 @@ func GetUserByToken(token string) (sysmodel.SSOUser, error) {
 	userId := redishelper.GetString(confighelper.GetEnterpriseID(), confighelper.GetSessionDbIndex(), token)
 
 	if g.IsEmpty(userId) {
+
 		sidArr := strings.Split(token, ":")
 		if len(sidArr) > 2 {
+
 			loginDate := sidArr[2] //取登录日期
 
-			//如果是当天登录的过，说明没有过期， 就再重新从redis获取2次
+			//如果是当天登录的过，说明没有过期， 就再重新从redis获取3次
 			if loginDate == commutil.GetNowYYDDMM() {
 				b := debug.Stack()
 				stack := string(b)
@@ -43,7 +63,7 @@ func GetUserByToken(token string) (sysmodel.SSOUser, error) {
 					//延时后重新获取
 					userId = redishelper.GetString(confighelper.GetEnterpriseID(), confighelper.GetSessionDbIndex(), token)
 
-					go common.InsertLoginLog(userId, "bpmserver服务GetUserByToken执行失败，userId="+userId+" Sid="+token+
+					go common.InsertLoginLog(userId, "easyfa服务GetUserByToken执行失败，userId="+userId+" Sid="+token+
 						"当天登录信息获取失败，偿试第"+commutil.ToString(i)+"次重获redis信息"+
 						" 程序stack="+stack, token, "")
 
@@ -57,17 +77,13 @@ func GetUserByToken(token string) (sysmodel.SSOUser, error) {
 		}
 	}
 
-	if g.IsEmpty(userId) {
-		return sysmodel.SSOUser{}, errors.New("未取到缓存中用户ID信息")
+	if userId == "" {
+		return sysmodel.SSOUser{}, UserCheckErrorBySessionEmpty
 	}
 
 	user, err := GetUserFormUserId(userId)
 	if err != nil {
-
-		b := debug.Stack()
-		stack := string(b)
-
-		go common.InsertLoginLog(userId, "bpmserver服务GetUserByToken执行失败，userId="+userId+" Sid="+token+"未从redis获取到用户对象"+" 程序stack="+stack, token, "")
+		go common.InsertLoginLog(userId, "easyfa服务GetUserByToken 执行失败 userId="+userId+" Sid="+token+"未从redis获取到用户对象", token, "")
 		return user, err
 	} else {
 		/// 取消Token不一致 检查，以支持多端登录 ， 用户信息的SID设置为传的Token ，例如：后续接口调用时才能保证SID为同一个。
@@ -76,15 +92,18 @@ func GetUserByToken(token string) (sysmodel.SSOUser, error) {
 	}
 }
 
-//根据userid 获取user对象
+// 根据userid 获取user对象
 func GetUserFormUserId(UserId string) (sysmodel.SSOUser, error) {
+
 	userjson := redishelper.GetString(confighelper.GetEnterpriseID(), confighelper.GetSessionDbIndex(), UserId)
 	if userjson != "" {
 		userbyte := []byte(userjson)
 		newUser := sysmodel.SSOUser{}
 		err := json.Unmarshal(userbyte, &newUser)
 		if err != nil {
-			return sysmodel.SSOUser{}, errors.New("获取用户Session为空")
+			loghelper.ByError("获取用户信息失败", commutil.AppendStr("解析用户JSON失败:",
+				"userjson:", userjson, ",err:", err.Error()), UserId)
+			return sysmodel.SSOUser{}, errors.New("获取用户信息失败！")
 		}
 		rolelen := len(newUser.UserRoleIds)
 		if rolelen == 0 {
@@ -99,18 +118,19 @@ func GetUserFormUserId(UserId string) (sysmodel.SSOUser, error) {
 
 		return newUser, nil
 	} else {
-		return sysmodel.SSOUser{}, errors.New("获取用户信息为空,请重新登录")
+		return sysmodel.SSOUser{}, UserCheckErrorBySessionEmpty
 	}
 }
 
-//根据http获取用户对象
+// 根据http获取用户对象
 func GetUserFromHttp(Ctx *gin.Context) (sysmodel.SSOUser, error) {
 
 	var user sysmodel.SSOUser
 	var err error
+	hasUserInfo := false
 	sidCookie := Ctx.Request.Header.Get("authorization")
 	if sidCookie == "" {
-		// 历史参数。做兼容二次获取
+		// 历史参数。这里做兼容二次获取
 		sidCookie = Ctx.Request.Header.Get("set-cookie")
 	}
 	var httpSid string
@@ -119,85 +139,65 @@ func GetUserFromHttp(Ctx *gin.Context) (sysmodel.SSOUser, error) {
 		if arr != nil && len(arr) > 0 {
 			httpSid = arr[1]
 			user, err = GetUserByToken(httpSid)
+			hasUserInfo = true
 		}
 	} else {
-
-		httpSid = Ctx.Request.Header.Get("sid")
-
-		if g.IsEmpty(httpSid) {
-			//再次通过SID 获取 一般针对于自定义事件内部服务器直接传SID
-			httpSid = Ctx.PostForm("sid")
-		}
-
+		//再次通过SID 获取 一般针对于自定义事件内部服务器直接传SID
+		httpSid = Ctx.PostForm("sid")
 		if !g.IsEmpty(httpSid) {
 			user, err = GetUserByToken(httpSid)
+			hasUserInfo = true
 		} else {
 			err = errors.New("head获取cookie,请重新登录")
 		}
+
 	}
 
 	if err != nil {
-
-		if &user != nil {
+		if &user != nil && hasUserInfo {
 			b := debug.Stack()
 			stack := string(b)
-			go common.InsertLoginLog(user.UserID, "bpmserver服务GetUserFromHttp执行失败，userid="+user.UserID+" 程序stack="+stack+"http参数set-cookie="+sidCookie+"httpSid="+httpSid+"用户对象Sid="+user.SId+"未从redis获取到用户对象", user.SId, "")
+			go common.InsertLoginLog(user.UserID, "easyfa服务GetUserFromHttp执行失败，userid="+user.UserID+" 程序stack="+stack+"http参数set-cookie="+sidCookie+"httpSid="+httpSid+"用户对象Sid="+user.SId+"未从redis获取到用户对象", user.SId, "")
 		}
-
 		return user, err
 	} else {
+
+		//如果是接口事件，因为系统共用一个接口用户，所以需要再次一次实际entid
+		if strings.Contains(user.UserName, "接口账号") {
+			entid := Ctx.PostForm("entid")
+			if !g.IsEmpty(entid) && entid != "null" && entid != "undefined" {
+				user.EntID = entid
+			}
+		}
+
 		if g.IsEmpty(user.EntID) {
-
-			b := debug.Stack()
-			stack := string(b)
-
-			go common.InsertLoginLog(user.UserID, "bpmserver服务GetUserFromHttp执行失败，userid="+user.UserID+" 程序stack="+stack+"http参数set-cookie="+sidCookie+"httpSid="+httpSid+"用户对象Sid="+user.SId+"未从redis获取到用户对象", user.SId, "")
-
 			return sysmodel.SSOUser{}, errors.New("未选择企业,请重新登录")
-		} else {
-			//记录用户在线数
-			//	go SaveOnlinecnt(user)
 		}
 		return user, nil
 	}
 }
 
-var mutex sync.RWMutex
+func IsAdmin(user *sysmodel.SSOUser) bool {
+	roleIds := user.UserRoleIds
+	if roleIds == nil {
+		return false
+	}
 
-//记录用户在线数(只保留一个月的数据)
-func SaveOnlinecnt(user sysmodel.SSOUser) {
-	mutex.Lock()
-	defer mutex.Unlock()
-	day := time.Now().Day()
-	hour := time.Now().Hour()
-	userid := user.UserID
-	entid := user.EntID
-	//每个月1号，删除上个月的用户在线记录
-	if day == 1 {
-		sql := "delete from sys_onlinecnt where date_format(InsertDate,'%Y-%m') = ?"
-		_, err := dbhelper.ExecSql(userid, true, sql, commutil.TimeFormat(time.Now().AddDate(0, -1, 0), "2006-01"))
-		if err != nil {
-			loghelper.ByError(logtype.ExecSqlErr, err.Error()+" 删除上个月的用户在线记录失败SQL:"+sql, user.UserID)
-		}
+	//如果是管理员则返回true
+	if _, isok := roleIds["2"]; isok {
+		return true
 	}
-	//验证该用户在当前时间段内是否登录过
-	sql := "select count(1) from sys_onlinecnt where day = ? and time = ? and userid = ? and entid = ?"
-	count, err := dbhelper.QueryFirstCol(userid, true, sql, day, hour, userid, entid)
-	if err != nil {
-		loghelper.ByError(logtype.QueryErr, err.Error()+" 查询用户在线记录sql:"+sql, user.UserID)
+	//超级管理员
+	if _, isok := roleIds["3"]; isok {
+		return true
 	}
-	if commutil.ToInt(count) == 0 {
-		//在当前时间段未登录则记录在线用户信息
-		sql = "insert into sys_onlinecnt(OnlinecntId,EntId,UserId,Day,Time,InsertDate) values(?,?,?,?,?,now())"
-		_, err = dbhelper.ExecSql(user.UserID, true, sql, commutil.GetUUID(), entid, userid, day, hour)
-		if err != nil {
-			loghelper.ByError(logtype.ExecSqlErr, err.Error()+" 记录用户在线数sql:"+sql, user.UserID)
-		}
-	}
+
+	return false
 }
 
-//检查APPID ，如果有效就生成虚拟用户
+// 检查APPID ，如果有效就生成虚拟用户
 func GetVirtualUserByAppId(ctx *gin.Context) (sysmodel.SSOUser, error) {
+
 	err, appid, _, entid := byaccount.ChkExAppid(ctx)
 	if err != nil {
 		return sysmodel.SSOUser{}, err
@@ -218,7 +218,7 @@ func GetVirtualUserByAppId(ctx *gin.Context) (sysmodel.SSOUser, error) {
 			}
 			user.UserRoleIds = make(map[string]string)
 			user.UserRoleIds["1"] = "普通用户"
-			_, _ = byaccount.GetUsersEnt(&user) //绑定企业属性 例;IsCostCenter
+			_, err = byaccount.GetUsersEnt(&user) //绑定企业属性 例;IsCostCenter
 			if err != nil {
 				return user, err
 			}
@@ -227,13 +227,132 @@ func GetVirtualUserByAppId(ctx *gin.Context) (sysmodel.SSOUser, error) {
 
 		if user.EnList == nil || len(user.EnList) == 0 {
 			// 做补救登录处理
-			_, _ = byaccount.GetUsersEnt(&user) //绑定企业属性 例;IsCostCenter
+			_, err = byaccount.GetUsersEnt(&user) //绑定企业属性 例;IsCostCenter
 			if err != nil {
 				return user, err
 			}
 			byaccount.SetUserSession(&user)
 		}
-
 		return user, nil
 	}
+}
+
+// 检查APPID ，如果有效就生成虚拟用户
+func GetVirtualUserByConfigIni(ctx *gin.Context) (sysmodel.SSOUser, error) {
+
+	err, appid, secret := getAppId(ctx) //获取前台参数
+	if err != nil {
+		return sysmodel.SSOUser{}, err
+	} else {
+
+		request_key := encryptutil.StringToBase64(appid)
+		request_secret := encryptutil.StringToBase64(secret)
+		config_key := confighelper.GetIniConfig("exocr", "fcfk")
+		config_secret := confighelper.GetIniConfig("exocr", "fcfs")
+
+		if config_key == request_key && config_secret == request_secret {
+
+			user := sysmodel.SSOUser{
+				UserCode:  appid,
+				IsEnc:     false,
+				UserID:    appid,
+				LoginUid:  appid,
+				UserName:  "接口账号",
+				EntID:     "1",
+				FormEntId: "1",
+				LoginTime: commutil.GetNowTime(),
+				SId:       "interface_" + appid,
+				AppId:     appid,
+			}
+
+			user.UserRoleIds = make(map[string]string)
+			user.UserRoleIds["1"] = "普通用户"
+
+			return user, nil
+
+		}
+
+		return sysmodel.SSOUser{}, errors.New("生成接口用户失败")
+	}
+}
+
+func getAppId(ctx *gin.Context) (err error, appid, secret string) {
+
+	appid = ctx.PostForm("appid")
+	secret = ctx.PostForm("secret")
+
+	//timestamp := ctx.PostForm("timestamp") //时间戳检查
+	//sign := ctx.PostForm("sign")           //参数签名
+
+	if g.IsEmpty(appid) {
+		appid = ctx.Query("appid")
+	}
+	if g.IsEmpty(secret) {
+		secret = ctx.Query("secret")
+	}
+	//从请求头获取参数
+	if appid == "" {
+		appid = ctx.Request.Header.Get("appid")
+	}
+	if secret == "" {
+		secret = ctx.Request.Header.Get("secret")
+	}
+
+	if g.IsEmpty(appid) {
+		return errors.New("未获取到appid"), "", ""
+	} else {
+		return nil, appid, secret
+	}
+}
+
+// tokenID 和 文件 做关联处理
+func GetFileOAuthTokenByAttach(tokenID, fid string) string {
+	return tokenID //暂时直接返回tokenID，待优化
+}
+
+func GetFileOAuthTokenByUserID(userID string) string {
+	if userID == "" {
+		return ""
+	}
+	tokenID := ""
+	userKey := CustomFileTokenUseridKey + userID
+	authKey := ""
+	val := rediscache.GetString(userKey)
+	if val != "" {
+		valList := strings.Split(val, ":")
+		if len(valList) > 1 {
+			if valList[1] == commutil.GetNowYYDDMM() {
+				tokenID = val //相同一天,不更新
+			}
+		} else {
+			tokenID = val
+		}
+	}
+	if tokenID != "" {
+		return tokenID
+	}
+	tokenID = commutil.GetUUID() + ":" + commutil.GetNowYYDDMM()
+	authKey = CustomFileTokenOauthidKey + tokenID
+	rediscache.SetStringExpire(userKey, tokenID, 60*60*24) //1天过期
+	rediscache.SetStringExpire(authKey, userID, 60*60*24)  //1天过期
+	return tokenID
+}
+
+func GetFileOAuthTokenByUser(user *sysmodel.SSOUser) string {
+	return GetFileOAuthTokenByUserID(user.UserID)
+}
+
+// ValidateFileOAuthToken 文件访问token验证
+// tokenID:文件访问token(用户token)
+// ts:时间戳
+func ValidateFileOAuthToken(tokenID string, ts string) (err error) {
+	if tokenID == "" {
+		return fmt.Errorf("未授权访问")
+	}
+	authKey := CustomFileTokenOauthidKey + tokenID
+	val := rediscache.GetString(authKey)
+	if val != "" {
+		return
+	}
+	return fmt.Errorf("无效token")
 }

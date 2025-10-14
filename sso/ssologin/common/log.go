@@ -8,8 +8,8 @@ import (
 
 //插入登录日志
 func InsertLoginLog(userId, logMsg, sid, appterminal string) {
-	defer commutil.CatchError()
-	eng, _ := conn.GetConnection(userId, false)
+
+	eng, _ := conn.GetDB()
 	log := ssomodel.Sys_LogCheckLogin{
 		Logid:       commutil.GetUUID(),
 		LogMsg:      logMsg,

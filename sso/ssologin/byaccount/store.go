@@ -4,12 +4,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/gogf/gf/frame/g"
 	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/redishelper"
 	"github.com/luoliDark/base/sso/ssologin/common"
 	"github.com/luoliDark/base/sysmodel"
 	"github.com/luoliDark/base/util/commutil"
+
+	"github.com/gogf/gf/frame/g"
 )
 
 // 设置用户缓存， redis 以及cookie

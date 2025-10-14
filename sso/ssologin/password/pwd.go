@@ -3,7 +3,6 @@ package password
 import (
 	"fmt"
 
-	"github.com/luoliDark/base/confighelper"
 	"github.com/luoliDark/base/db/conn"
 	"github.com/luoliDark/base/loghelper"
 	"github.com/luoliDark/base/sysmodel"
@@ -67,12 +66,7 @@ func Resetpwd(ssoUser sysmodel.SSOUser, uid string) *sysmodel.ResultBean {
 	if e != nil || !isok {
 		return resultBean.SetError("", fmt.Sprint("未获取到重置密码的用户:", e), "")
 	}
-	defaultPwd := confighelper.GetIniConfig("global", "resetLoginDefaultPwd")
-	if defaultPwd != "" {
-		user.UserPwd = encryptutil.EncryptSha256(defaultPwd)
-	} else {
-		user.UserPwd = encryptutil.EncryptSha256(user.UserCode)
-	}
+	user.UserPwd = encryptutil.EncryptSha256(user.UserCode)
 
 	_, e = db.Where("UserID=?", uid).Cols("UserPwd").Update(user)
 	if e != nil {
